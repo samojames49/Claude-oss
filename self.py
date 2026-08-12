@@ -1,7 +1,7 @@
 import requests
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
-from pyrogram.types import ReactionTypeEmoji 
+from compat import ReactionTypeEmoji
 from apscheduler.jobstores.base import JobLookupError
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -533,8 +533,7 @@ class PishiTaskManager:
             
             self.update_task(task_id, {"status": "harvesting"})
             
-            from main import app
-            
+            # app در همین ماژول تعریف شده؛ import از main اشتباه بود و کرش می‌داد
             try:
                 info = await asyncio.wait_for(
                     get_pishi_status(app, chat_id),

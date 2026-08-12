@@ -49,4 +49,23 @@ except ImportError:  # Pyrogram استاندارد
         InlineKeyboardButton.__init__ = _init_with_style
 
 
-__all__ = ["ButtonStyle", "NATIVE_BUTTON_STYLE"]
+try:  # فورک‌هایی که ری‌اکشن را پشتیبانی می‌کنند
+    from pyrogram.types import ReactionTypeEmoji  # noqa: F401
+
+    NATIVE_REACTION_TYPE = True
+except ImportError:  # Pyrogram استاندارد فاقد این کلاس است
+    NATIVE_REACTION_TYPE = False
+
+    class ReactionTypeEmoji:
+        """جایگزین سبک؛ فقط emoji را نگه می‌دارد.
+
+        فراخوانی واقعی set_reaction با این کلاس روی Pyrogram استاندارد کار
+        نمی‌کند (این قابلیت مخصوص فورک است) ولی import و اجرای بقیهٔ کد را
+        مختل نمی‌کند.
+        """
+
+        def __init__(self, emoji=None):
+            self.emoji = emoji
+
+
+__all__ = ["ButtonStyle", "NATIVE_BUTTON_STYLE", "ReactionTypeEmoji", "NATIVE_REACTION_TYPE"]
