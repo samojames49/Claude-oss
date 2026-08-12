@@ -10,7 +10,9 @@ import sys
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # override=True یعنی مقادیر .env بر متغیرهای محیطیِ از قبل ست‌شده اولویت دارند
+    # تا پیکربندی همیشه از .env خوانده شود (طبق طراحی پروژه).
+    load_dotenv(override=True)
 except ImportError:  # python-dotenv نصب نیست؛ فقط از محیط سیستم می‌خوانیم
     pass
 
