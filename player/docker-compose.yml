@@ -1,0 +1,24 @@
+services:
+  player:
+    build:
+      context: ..
+      dockerfile: player/Dockerfile
+    container_name: telegram-player
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # دیتابیس بیرون از مسیر کد نگه داشته می‌شود تا با آپدیت ایمیج پاک نشود
+      DB_FILE: /app/data/player_db.json
+    volumes:
+      - player-sessions:/app/player/sessions
+      - player-cache:/app/player/cache
+      - player-downloads:/app/player/downloads
+      - player-data:/app/data
+    stop_grace_period: 20s
+
+volumes:
+  player-sessions:
+  player-cache:
+  player-downloads:
+  player-data:

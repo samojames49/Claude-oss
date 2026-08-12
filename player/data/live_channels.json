@@ -1,0 +1,81 @@
+{
+  "_readme": [
+    "فهرست شبکه‌های «پخش زنده». این فایل را آزادانه ویرایش کنید یا با متغیر",
+    "LIVE_CHANNELS_FILE به فایل دیگری اشاره بدهید؛ ربات بدون ری‌استارت آن را",
+    "دوباره می‌خواند (با دستور «بروزرسانی شبکه ها»).",
+    "قالب هر دسته: {\"title\": نام دسته, \"channels\": [{\"name\": …, \"url\": …, \"video\": true}]}",
+    "فقط لینک‌هایی اضافه کنید که اجازهٔ پخش عمومی دارند؛ لینک‌های زیر نمونهٔ",
+    "پخش‌های آزاد و رسمی هستند."
+  ],
+  "categories": [
+    {
+      "id": "news",
+      "title": "📰 خبری",
+      "channels": [
+        {
+          "name": "DW فارسی",
+          "url": "https://dwamdstream106.akamaized.net/hls/live/2017960/dwstream106/index.m3u8",
+          "video": true
+        },
+        {
+          "name": "France 24 English",
+          "url": "https://f24hls-i.akamaihd.net/hls/live/221193/F24_EN_HI_HLS/master_900.m3u8",
+          "video": true
+        },
+        {
+          "name": "Al Jazeera English",
+          "url": "https://live-hls-web-aje.getaj.net/AJE/index.m3u8",
+          "video": true
+        },
+        {
+          "name": "Euronews English",
+          "url": "https://rakuten-euronews-4-gb.samsung.wurl.tv/playlist.m3u8",
+          "video": true
+        }
+      ]
+    },
+    {
+      "id": "sport",
+      "title": "⚽️ ورزشی",
+      "channels": [
+        {
+          "name": "Red Bull TV",
+          "url": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+          "video": true
+        },
+        {
+          "name": "FIFA+ (Samsung TV Plus)",
+          "url": "https://fifaplus-samsungca.amagi.tv/playlist.m3u8",
+          "video": true
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "title": "🎵 موسیقی و رادیو",
+      "channels": [
+        {
+          "name": "Radio Javan (رادیو)",
+          "url": "https://stream.zeno.fm/0r0xa792kwzuv",
+          "video": false
+        },
+        {
+          "name": "BBC World Service (رادیو)",
+          "url": "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service",
+          "video": false
+        }
+      ]
+    },
+    {
+      "id": "science",
+      "title": "🔭 علمی و مستند",
+      "channels": [
+        {
+          "name": "NASA TV Public",
+          "url": "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8",
+          "video": true
+        }
+      ]
+    }
+  ]
+}
