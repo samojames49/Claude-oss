@@ -6,14 +6,19 @@ import json
 import os
 import asyncio
 
-TOKEN = "8476292437:AAFlNjO08BhaORWxAIDZUnzZWVApQhc6Ckk"  # توکن ربات
+import config
+from db import read_only_snapshot
+
+config.require("HELPER_BOT_TOKEN")
+
+TOKEN = config.HELPER_BOT_TOKEN
 COMMAND_FILE = "selfbot_commands.json"
 SETTINGS_FILE = "settings.json"
 REACTION_RESULT_FILE = "reaction_result.json"
-PANEL_IMAGE = "link"  # لینک عکس هلپر اگر نداری فقط عکس رو توی ربات هلپر بفرست خودش تنظیم میشه
+PANEL_IMAGE = config.PANEL_IMAGE or "link"
 PHOTO_FILE = "panel_photo.json"
-ADMIN_ID = 8641952987 # ایدی ادمین
-MANAGER_BOT_LINK = "https://t.me/0000"  # لینک ربات سلف ساز رو اینجا بذار
+ADMIN_ID = config.ADMIN_ID
+MANAGER_BOT_LINK = config.MANAGER_BOT_LINK
 
 def save_photo_id(file_id):
     try:
@@ -48,20 +53,17 @@ def get_user_settings_file(user_id):
     return f"settings_{user_id}.json"
 async def check_selfbot_active(user_id):
     try:
-        db_path = "database.json"        
-        if os.path.exists(db_path):
-            with open(db_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            users = data.get("users", {})
-            processes = data.get("processes", {})
-            
-            user_data = users.get(str(user_id), {})
-            process = processes.get(str(user_id))
-            
-            if user_data.get('status') == 'active' and process:
-                return True, user_data.get('phone', '')
-        
+        # خواندن پایگاه‌داده در ترد جدا تا حلقهٔ رویداد قفل نشود؛ خواندن امن که
+        # اگر فایل در حال نوشتن باشد از نسخهٔ .bak استفاده می‌کند.
+        data = await asyncio.to_thread(read_only_snapshot, config.DATABASE_FILE)
+        users = data.get("users", {})
+        processes = data.get("processes", {})
+
+        user_data = users.get(str(user_id), {})
+        process = processes.get(str(user_id))
+
+        if user_data.get('status') == 'active' and process:
+            return True, user_data.get('phone', '')
         return False, None
     except Exception as e:
         print(f"❌ خطا در بررسی سلف: {e}")
@@ -153,6 +155,30 @@ CLOCK_SIMPLE_TEXT = """
 🔹 برای تغییر فونت روی دکمه فونت کلیک کنید
 """
 HELP_TEXTS = {
+    "watch": """
+👁 <b>رصد کاربران (Self VTR)</b>
+
+<b>دستورات قابل کپی:</b>
+روی پیام کاربر ریپلای کنید و بزنید:
+<code>رصد</code>
+<code>حذف رصد</code>
+<code>لیست رصد</code>
+
+<b>کاربرد:</b>
+هر تغییری در اسم، یوزرنیم، بایو یا عکس پروفایل کاربرِ تحت رصد،
+بلافاصله به Saved Messages شما اطلاع داده می‌شود.
+""",
+    "autoprofile": """
+🎭 <b>پروفایل خودکار (Self VTR)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>ست پروفایل اسم۱ | اسم۲ | اسم۳</code>
+<code>پروفایل خودکار روشن</code>
+<code>پروفایل خودکار خاموش</code>
+
+<b>کاربرد:</b>
+اسم پروفایل شما به‌صورت چرخشی بین اسم‌های تعیین‌شده تغییر می‌کند.
+""",
     "time": """
 ⏰ <b>مدیریت ساعت</b>
 
@@ -990,9 +1016,32 @@ def get_main_menu_page2(user_id):
             InlineKeyboardButton("● مدیریت گروه ●", callback_data=f"help_group_{user_id}_2", style="primary")
         ],
         [
+            InlineKeyboardButton("⭐️ قابلیت‌های پیشرفته (VTR)", callback_data=f"advanced_{user_id}_2", style="success")
+        ],
+        [
             InlineKeyboardButton("⬅", callback_data=f"page1_{user_id}", style="primary"),
             InlineKeyboardButton("❌", callback_data=f"close_{user_id}", style="danger")
         ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_advanced_buttons(user_id, page=2):
+    """منوی قابلیت‌های پیشرفتهٔ سبک Self VTR با تاگل وضعیت."""
+    settings = load_settings(user_id)
+    adv = settings.get('advanced', {})
+
+    def mark(key):
+        return "✅" if adv.get(key) else "⬜️"
+
+    keyboard = [
+        [InlineKeyboardButton(f"{mark('bio_time')} ساعت در بایو", callback_data=f"adv_biotime_{user_id}_{page}", style="primary")],
+        [InlineKeyboardButton(f"{mark('save_deleted')} ذخیره حذفیات", callback_data=f"adv_savedel_{user_id}_{page}", style="primary")],
+        [InlineKeyboardButton(f"{mark('save_edited')} ذخیره ویرایش‌ها", callback_data=f"adv_saveedit_{user_id}_{page}", style="primary")],
+        [InlineKeyboardButton("👁 رصد کاربران (راهنما)", callback_data=f"help_watch_{user_id}_{page}", style="success")],
+        [InlineKeyboardButton("🎭 پروفایل خودکار (راهنما)", callback_data=f"help_autoprofile_{user_id}_{page}", style="success")],
+        [InlineKeyboardButton("⏳ انقضا / زمان باقی‌مانده", callback_data=f"adv_expiry_{user_id}_{page}", style="danger")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data=f"help_back_{user_id}_{page}", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1137,28 +1186,46 @@ async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFA
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    
-    data = query.data
+    data = query.data or ""
     user_id = query.from_user.id
     photo = get_panel_photo()
-    
-    if not f"_{user_id}" in data:
+
+    # دکمه‌های موقت بدون شناسه کاربر
+    if data == "wait":
+        await query.answer("⏳ لطفا صبر کنید...")
+        return
+
+    # دکمهٔ «بررسی مجدد» وقتی سلف فعال نیست
+    if data.startswith("check_selfbot_"):
+        await query.answer()
+        active, phone = await check_selfbot_active(user_id)
+        if active:
+            await query.edit_message_text("✅ سلف شما فعال است! پنل را دوباره باز کنید.")
+        else:
+            await query.answer("❌ سلف شما هنوز فعال نیست. ابتدا در ربات سلف‌ساز لاگین کنید.", show_alert=True)
+        return
+
+    # کنترل دسترسی: کاربر فقط دکمه‌های خودش را می‌بیند (یک بار answer)
+    if f"_{user_id}" not in data:
         await query.answer("❌ دسترسی غیرمجاز!", show_alert=True)
         return
-    
+
+    await query.answer()
+
     parts = data.split("_")
     if len(parts) >= 2:
         action = parts[0]
+        # نکتهٔ باگ قبلی: برای *_back مقدار page از parts[2] (که در واقع user_id
+        # است) خوانده می‌شد. page همیشه آخرین بخش است.
         if parts[0] == "help" and parts[1] == "back":
             action = "help_back"
-            page = int(parts[2]) if len(parts) > 2 else 1
+            page = int(parts[-1]) if parts[-1].isdigit() else 1
         elif parts[0] == "clock" and parts[1] == "back":
             action = "clock_back"
-            page = int(parts[2]) if len(parts) > 2 else 1
+            page = int(parts[-1]) if parts[-1].isdigit() else 1
         elif parts[0] == "oneclick" and parts[1] == "back":
             action = "oneclick_back"
-            page = int(parts[2]) if len(parts) > 2 else 1
+            page = int(parts[-1]) if parts[-1].isdigit() else 1
         else:
             page = int(parts[-1]) if parts[-1].isdigit() else 1
     else:
@@ -1260,11 +1327,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if action == "close":
+        # پیام‌های پنل عکس‌دار هستند؛ edit_message_text روی آن‌ها خطا می‌دهد،
+        # پس کپشن ویرایش یا خود پیام حذف می‌شود.
         try:
-            await query.edit_message_text("✅ پنل بسته شد")
+            if query.message and query.message.photo:
+                await query.edit_message_caption(caption="✅ پنل بسته شد", parse_mode='HTML')
+            else:
+                await query.edit_message_text("✅ پنل بسته شد")
         except Exception as e:
             if "Message is not modified" not in str(e):
-                print(f"Error: {e}")
+                try:
+                    await query.message.delete()
+                except Exception:
+                    print(f"Error: {e}")
         return
     
     if action == "help" and len(parts) > 1 and parts[1] == "oneclick":
@@ -1447,6 +1522,57 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "Message is not modified" not in str(e):
                     print(f"Error: {e}")
             return
+    if action == "advanced":
+        text = (
+            "⭐️ <b>قابلیت‌های پیشرفته (سبک Self VTR)</b>\n\n"
+            "با دکمه‌های زیر قابلیت‌ها را روشن/خاموش کنید.\n"
+            "برای رصد کاربران و پروفایل خودکار، راهنمای مربوطه را ببینید."
+        )
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
+                reply_markup=get_advanced_buttons(user_id, page)
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "adv":
+        feature = parts[1]
+        settings = load_settings(user_id)
+        adv = settings.setdefault('advanced', {})
+
+        if feature == "expiry":
+            send_command_to_self_bot("انقضا", user_id)
+            await query.answer("✅ دستور انقضا ارسال شد؛ نتیجه در چت سلف نمایش داده می‌شود.", show_alert=True)
+            return
+
+        toggle_map = {
+            "biotime": ("bio_time", "بیو تایم"),
+            "savedel": ("save_deleted", "سیو حذفیات"),
+            "saveedit": ("save_edited", "سیو ادیت"),
+        }
+        if feature in toggle_map:
+            key, cmd = toggle_map[feature]
+            new_state = not adv.get(key, False)
+            adv[key] = new_state
+            save_settings(user_id, settings)
+            send_command_to_self_bot(f"{cmd} {'روشن' if new_state else 'خاموش'}", user_id)
+            try:
+                await query.edit_message_media(
+                    media=InputMediaPhoto(
+                        media=photo,
+                        caption="⭐️ <b>قابلیت‌های پیشرفته (سبک Self VTR)</b>",
+                        parse_mode='HTML',
+                    ),
+                    reply_markup=get_advanced_buttons(user_id, page),
+                )
+            except Exception as e:
+                if "Message is not modified" not in str(e):
+                    print(f"Error: {e}")
+        return
+
     if action == "help" and len(parts) > 1 and parts[1] in HELP_TEXTS:
         text = HELP_TEXTS.get(parts[1], "راهنما")
         try:
