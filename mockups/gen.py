@@ -128,6 +128,10 @@ PAGES.append(page(
      ["⬜️ ذخیره ویرایش‌ها"],
      ["رصد کاربران", "پروفایل خودکار"],
      ["انقضا / زمان باقی‌مانده"],
+     ["🎉 سرگرمی", "🔤 ابزار متن"],
+     ["👤 مدیریت پروفایل", "🕐 زمان و وضعیت"],
+     ["🌐 مترجم", "📊 نظرسنجی"],
+     ["🧹 پاکسازی پیام‌های من"],
      ["❌ بستن"]],
     ava="H", banner_text="🎛 پنل مدیریت سلف"))
 
@@ -179,6 +183,11 @@ def shoot(fname, path):
     print("saved", png, canvas.size)
 
 
-for fname, path in PAGES:
-    shoot(fname, path)
-print("DONE")
+if __name__ == "__main__":
+    import sys
+    only = sys.argv[1] if len(sys.argv) > 1 else None
+    for fname, path in PAGES:
+        if only and only not in fname:
+            continue
+        shoot(fname, path)
+    print("DONE")
