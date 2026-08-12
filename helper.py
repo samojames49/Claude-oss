@@ -155,6 +155,102 @@ CLOCK_SIMPLE_TEXT = """
 🔹 برای تغییر فونت روی دکمه فونت کلیک کنید
 """
 HELP_TEXTS = {
+    "eavesdrop": """
+👁 <b>شنود کاربران (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+روی پیام کاربر ریپلای کنید و بزنید:
+<code>شنود</code>
+<code>حذف شنود</code>
+<code>لیست شنود</code>
+
+<b>کاربرد:</b>
+تمام پیام‌های کاربرِ هدف (متن/عکس/ویدیو/ویس) بلافاصله به
+Saved Messages شما فوروارد می‌شود. برای رصد مخفیانهٔ گفتگوها.
+""",
+    "friends": """
+💚 <b>مدیریت دوستان (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+روی پیام کاربر ریپلای کنید و بزنید:
+<code>دوست</code>
+<code>حذف دوست</code>
+سایر دستورها:
+<code>لیست دوست</code>
+<code>پاک دوستان</code>
+
+<b>کاربرد:</b>
+لیست دوستان خود را نگه‌دارید (مکمل «مدیریت دشمنان»).
+""",
+    "sessions": """
+📱 <b>نشست‌ها / گوشی‌ها (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>نشست ها</code>
+<code>پاک نشست ها</code>
+
+<b>کاربرد:</b>
+نمایش همهٔ دستگاه‌ها و نشست‌های فعالِ اکانت شما (مدل دستگاه،
+اپلیکیشن، کشور). با «پاک نشست ها» همهٔ نشست‌ها به‌جز نشست فعلی
+بسته می‌شوند — برای امنیت اکانت.
+""",
+    "readall": """
+👀 <b>خواندن پیام‌ها (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>خواندن همه</code>
+<code>خواندن خودکار روشن</code>
+<code>خواندن خودکار خاموش</code>
+
+<b>کاربرد:</b>
+«خواندن همه» همهٔ چت‌های نخوانده را یک‌جا خوانده می‌کند.
+«خواندن خودکار» هر پیام جدید را بلافاصله می‌خواند (تیک دوم).
+""",
+    "afk": """
+🤖 <b>منشی / پاسخ خودکار پیوی (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>منشی روشن</code>
+<code>منشی روشن الان در دسترس نیستم</code>
+<code>منشی خاموش</code>
+
+<b>کاربرد:</b>
+وقتی روشن باشد، به هر پیام خصوصی به‌صورت خودکار (با فاصلهٔ زمانی)
+پاسخ داده می‌شود. متن دلخواه را بعد از «منشی روشن» بنویسید.
+""",
+    "randfont": """
+🔤 <b>فونت رندوم (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>فونت رندوم روشن</code>
+<code>فونت رندوم خاموش</code>
+
+<b>کاربرد:</b>
+هر پیامی که می‌فرستید، حروف لاتینش با یک فونت فانتزی تصادفی
+نمایش داده می‌شود (𝐁𝐨𝐥𝐝 / 𝓼𝓬𝓻𝓲𝓹𝓽 / Ⓒⓘⓡⓒⓛⓔⓓ …).
+""",
+    "emojiclock": """
+🕐 <b>ساعت ایموجی (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>ساعت ایموجی روشن</code>
+<code>ساعت ایموجی خاموش</code>
+
+<b>کاربرد:</b>
+کنار اسم شما یک ایموجی ساعت (🕐🕜…) متناسب با ساعت فعلی درج
+می‌شود و هر دقیقه به‌روز می‌شود.
+""",
+    "calc": """
+🧮 <b>حالت محاسبه (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>محاسبه روشن</code>
+<code>محاسبه خاموش</code>
+
+<b>کاربرد:</b>
+وقتی روشن باشد، هر پیامی که فقط یک عبارت ریاضی است
+(مثل <code>12*8+5</code>) خودکار حل و به «۱۲*۸+۵ = ۱۰۱» تبدیل می‌شود.
+""",
     "watch": """
 👁 <b>رصد کاربران (Self VTR)</b>
 
@@ -1119,6 +1215,21 @@ def get_main_menu(user_id):
             InlineKeyboardButton("پروفایل خودکار", callback_data=f"help_autoprofile_{user_id}_1", style="success")
         ],
         [InlineKeyboardButton("انقضا / زمان باقی‌مانده", callback_data=f"adv_expiry_{user_id}_1", style="danger")],
+        [InlineKeyboardButton(f"{mark('afk')} منشی (پاسخ خودکار پیوی)", callback_data=f"adv_afk_{user_id}_1", style="primary")],
+        [InlineKeyboardButton(f"{mark('auto_read')} خواندن خودکار همه", callback_data=f"adv_autoread_{user_id}_1", style="primary")],
+        [
+            InlineKeyboardButton(f"{mark('random_font')} فونت رندوم", callback_data=f"adv_randfont_{user_id}_1", style="secondary"),
+            InlineKeyboardButton(f"{mark('emoji_clock')} ساعت ایموجی", callback_data=f"adv_emojiclock_{user_id}_1", style="secondary")
+        ],
+        [InlineKeyboardButton(f"{mark('calc_mode')} حالت محاسبه", callback_data=f"adv_calc_{user_id}_1", style="warning")],
+        [
+            InlineKeyboardButton("👁 شنود کاربران", callback_data=f"help_eavesdrop_{user_id}_1", style="danger"),
+            InlineKeyboardButton("💚 دوستان", callback_data=f"help_friends_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("📱 نشست‌ها / گوشی‌ها", callback_data=f"help_sessions_{user_id}_1", style="danger"),
+            InlineKeyboardButton("👀 خواندن همه چت‌ها", callback_data=f"help_readall_{user_id}_1", style="primary")
+        ],
         [
             InlineKeyboardButton("🎉 سرگرمی", callback_data=f"help_fun_{user_id}_1", style="warning"),
             InlineKeyboardButton("🔤 ابزار متن", callback_data=f"help_texttools_{user_id}_1", style="warning")
@@ -1576,6 +1687,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "biotime": ("bio_time", "بیو تایم"),
             "savedel": ("save_deleted", "سیو حذفیات"),
             "saveedit": ("save_edited", "سیو ادیت"),
+            "afk": ("afk", "منشی"),
+            "autoread": ("auto_read", "خواندن خودکار"),
+            "randfont": ("random_font", "فونت رندوم"),
+            "emojiclock": ("emoji_clock", "ساعت ایموجی"),
+            "calc": ("calc_mode", "محاسبه"),
         }
         if feature in toggle_map:
             key, cmd = toggle_map[feature]

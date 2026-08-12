@@ -177,6 +177,18 @@ auto_profile_enabled = False
 auto_profile_interval = 300       # ثانیه
 auto_profile_task = None
 
+# ── قابلیت‌های سبک Self Saz (SwiftGram) ───────────────────────────────────────
+afk_enabled = False               # منشی/حالت دور بودن: پاسخ خودکار در پیوی
+afk_message = "الان در دسترس نیستم، بعداً پاسخ می‌دهم. 🙏"
+afk_last_reply = {}               # {chat_id: timestamp} برای جلوگیری از اسپم منشی
+friends = set()                   # لیست دوستان (سبک روابط Self Saz)
+eavesdrop_users = set()           # شنود: کاربرانی که پیام‌هایشان به Saved فوروارد می‌شود
+auto_read_enabled = False         # خواندن خودکار همهٔ پیام‌های ورودی
+random_font_enabled = False       # فونت رندوم روی متن خروجی
+calc_mode_enabled = False         # حالت محاسبه: حل خودکار عبارت‌های ریاضی خروجی
+emoji_clock_enabled = False       # ساعت ایموجی کنار اسم
+emoji_clock_original_name = None  # اسم اصلی برای بازگردانی ساعت ایموجی
+
 STATE_FILE = f"selfbot_state_{USER_ID}.json" if USER_ID else "selfbot_state.json"
 
 
@@ -217,6 +229,14 @@ def save_state():
             "auto_profile_names": auto_profile_names,
             "auto_profile_enabled": auto_profile_enabled,
             "auto_profile_interval": auto_profile_interval,
+            "afk_enabled": afk_enabled,
+            "afk_message": afk_message,
+            "friends": list(friends),
+            "eavesdrop_users": list(eavesdrop_users),
+            "auto_read_enabled": auto_read_enabled,
+            "random_font_enabled": random_font_enabled,
+            "calc_mode_enabled": calc_mode_enabled,
+            "emoji_clock_enabled": emoji_clock_enabled,
         }
         tmp = f"{STATE_FILE}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
@@ -233,6 +253,8 @@ def load_state():
     global anti_login_enabled, always_online_enabled, bio_time_enabled
     global save_deleted_enabled, save_edited_enabled, watched_users
     global auto_profile_names, auto_profile_enabled, auto_profile_interval
+    global afk_enabled, afk_message, friends, eavesdrop_users
+    global auto_read_enabled, random_font_enabled, calc_mode_enabled, emoji_clock_enabled
     if not os.path.exists(STATE_FILE):
         return
     try:
@@ -261,6 +283,14 @@ def load_state():
     auto_profile_names = state.get("auto_profile_names") or []
     auto_profile_enabled = state.get("auto_profile_enabled", False)
     auto_profile_interval = state.get("auto_profile_interval", 300)
+    afk_enabled = state.get("afk_enabled", False)
+    afk_message = state.get("afk_message") or afk_message
+    friends = set(int(x) for x in (state.get("friends") or []) if str(x).lstrip("-").isdigit())
+    eavesdrop_users = set(int(x) for x in (state.get("eavesdrop_users") or []) if str(x).lstrip("-").isdigit())
+    auto_read_enabled = state.get("auto_read_enabled", False)
+    random_font_enabled = state.get("random_font_enabled", False)
+    calc_mode_enabled = state.get("calc_mode_enabled", False)
+    emoji_clock_enabled = state.get("emoji_clock_enabled", False)
     print("✅ تنظیمات ذخیره‌شده بارگذاری شد")
 
 FONTS = {
@@ -1212,6 +1242,10 @@ async def continuous_time_updater(client: Client):
             if bio_time_enabled and (active_users or True):
                 await update_bio_with_time(client, current_time)
 
+            # ساعت ایموجی کنار اسم (سبک Self Saz) — فقط وقتی «تایم» عددی فعال نیست
+            if emoji_clock_enabled and not active_users:
+                await update_name_with_emoji_clock(client)
+
         except Exception as e:
             print(f"❌ خطا در مدیریت آپدیت زمان: {e}")
             await asyncio.sleep(60)
@@ -1233,6 +1267,31 @@ async def update_bio_with_time(client, current_time=None):
         return True
     except Exception as e:
         print(f"❌ خطا در آپدیت بایو: {e}")
+        return False
+
+
+_CLOCK_EMOJIS = ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"]
+
+
+def get_clock_emoji() -> str:
+    """ایموجی ساعت متناسب با ساعت فعلی تهران."""
+    now = datetime.now(pytz.timezone('Asia/Tehran'))
+    return _CLOCK_EMOJIS[now.hour % 12]
+
+
+async def update_name_with_emoji_clock(client) -> bool:
+    """درج ایموجی ساعت در انتهای اسم (بدون درج عدد)."""
+    global emoji_clock_original_name
+    try:
+        if emoji_clock_original_name is None:
+            me = await client.get_me()
+            base = me.first_name or ""
+            emoji_clock_original_name = re.sub(r"\s*[🕛🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚]+\s*$", "", base).strip()
+        new_name = f"{emoji_clock_original_name} {get_clock_emoji()}".strip()
+        await client.update_profile(first_name=new_name)
+        return True
+    except Exception as e:
+        print(f"❌ خطا در آپدیت ساعت ایموجی: {e}")
         return False
 
 
@@ -1346,7 +1405,42 @@ async def global_message_handler(client: Client, message: Message):
     if user_id == 777000:
         await forward_and_save_login_codes(client, message)
         return
-    
+
+    # ── خواندن خودکار پیام‌های ورودی (سبک «خواندن همه») ────────────────────
+    if auto_read_enabled:
+        try:
+            await client.read_chat_history(message.chat.id)
+        except Exception:
+            pass
+
+    # ── شنود: فوروارد پیام کاربران هدف به Saved Messages ───────────────────
+    if user_id in eavesdrop_users:
+        try:
+            await message.forward("me")
+        except Exception:
+            try:
+                await client.send_message(
+                    "me",
+                    f"👁 <b>شنود</b> از <code>{user_id}</code>:\n{message_text or '[مدیا]'}",
+                    parse_mode=enums.ParseMode.HTML,
+                )
+            except Exception:
+                pass
+
+    # ── منشی (AFK): پاسخ خودکار در پیوی هنگام دور بودن ─────────────────────
+    if afk_enabled and message.chat and message.chat.type == enums.ChatType.PRIVATE:
+        last = afk_last_reply.get(message.chat.id, 0)
+        if time.time() - last > 120:
+            afk_last_reply[message.chat.id] = time.time()
+            try:
+                await client.send_message(
+                    message.chat.id,
+                    afk_message,
+                    reply_to_message_id=message.id,
+                )
+            except Exception:
+                pass
+
     if str(user_id) in auto_reactions:
         try:
             reaction = auto_reactions[str(user_id)]
@@ -4217,6 +4311,27 @@ def safe_calc(expr: str):
     return _calc_eval(tree.body)
 
 
+# فونت‌های فانتزی برای «فونت رندوم» (تبدیل حروف لاتین)
+_FANCY_FONTS = [
+    {c: chr(0x1D400 + i) for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")} |
+    {c: chr(0x1D41A + i) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},   # bold
+    {c: chr(0x1D608 + i) for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")} |
+    {c: chr(0x1D622 + i) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},   # sans italic
+    {c: chr(0x1D5D4 + i) for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")} |
+    {c: chr(0x1D5EE + i) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},   # sans bold
+    {c: chr(0x1D670 + i) for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")} |
+    {c: chr(0x1D68A + i) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},   # monospace
+    {c: chr(0x24B6 + i) for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")} |
+    {c: chr(0x24D0 + i) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},    # circled
+]
+
+
+def apply_random_font(text: str) -> str:
+    """تبدیل حروف لاتین متن به یک فونت فانتزی تصادفی (حروف فارسی دست‌نخورده)."""
+    table = random.choice(_FANCY_FONTS)
+    return "".join(table.get(ch, ch) for ch in text)
+
+
 _FORTUNES = [
     "الا یا ایها الساقی ادر کأساً و ناولها / که عشق آسان نمود اول ولی افتاد مشکل‌ها",
     "بنشین بر لب جوی و گذر عمر ببین / کاین اشارت ز جهان گذران ما را بس",
@@ -4667,15 +4782,213 @@ async def group_id_command(client, message):
     await message.edit(f"🆔 **آیدی این گروه:** `{message.chat.id}`\n📛 {message.chat.title or ''}")
 
 
+# ── قابلیت‌های سبک Self Saz (SwiftGram) ───────────────────────────────────────
+
+@app.on_message(filters.me & filters.regex(r"^منشی (روشن|خاموش)(?: (.+))?$", flags=re.DOTALL))
+async def afk_command(client, message):
+    """منشی/حالت دور بودن: پاسخ خودکار در پیوی."""
+    global afk_enabled, afk_message
+    m = re.match(r"^منشی (روشن|خاموش)(?: (.+))?$", message.text, flags=re.DOTALL)
+    action = m.group(1)
+    if action == "روشن":
+        if m.group(2):
+            afk_message = m.group(2).strip()
+        afk_enabled = True
+        afk_last_reply.clear()
+        save_state()
+        await message.edit(f"🤖 **منشی روشن شد**\n💬 پیام: {afk_message}")
+    else:
+        afk_enabled = False
+        save_state()
+        await message.edit("🤖 **منشی خاموش شد**")
+
+
+@app.on_message(filters.me & filters.regex(r"^دوست$") & filters.reply)
+async def add_friend_command(client, message):
+    target = message.reply_to_message.from_user
+    if not target:
+        return await message.edit("❌ کاربر یافت نشد.")
+    friends.add(target.id)
+    save_state()
+    await message.edit(f"💚 **{target.first_name or target.id}** به لیست دوستان اضافه شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^حذف دوست$") & filters.reply)
+async def del_friend_command(client, message):
+    target = message.reply_to_message.from_user
+    if not target:
+        return await message.edit("❌ کاربر یافت نشد.")
+    friends.discard(target.id)
+    save_state()
+    await message.edit(f"💔 **{target.first_name or target.id}** از لیست دوستان حذف شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^لیست دوست$"))
+async def list_friends_command(client, message):
+    if not friends:
+        return await message.edit("💚 لیست دوستان خالی است.")
+    lines = "\n".join(f"• <code>{uid}</code>" for uid in friends)
+    await message.edit(f"💚 <b>لیست دوستان ({len(friends)}):</b>\n{lines}", parse_mode=enums.ParseMode.HTML)
+
+
+@app.on_message(filters.me & filters.regex(r"^پاک دوستان$"))
+async def clear_friends_command(client, message):
+    friends.clear()
+    save_state()
+    await message.edit("🧹 لیست دوستان پاک شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^شنود$") & filters.reply)
+async def eavesdrop_add_command(client, message):
+    target = message.reply_to_message.from_user
+    if not target:
+        return await message.edit("❌ کاربر یافت نشد.")
+    eavesdrop_users.add(target.id)
+    save_state()
+    await message.edit(f"👁 **شنود** برای «{target.first_name or target.id}» روشن شد.\nپیام‌هایش به Saved فوروارد می‌شود.")
+
+
+@app.on_message(filters.me & filters.regex(r"^حذف شنود$") & filters.reply)
+async def eavesdrop_del_command(client, message):
+    target = message.reply_to_message.from_user
+    if not target:
+        return await message.edit("❌ کاربر یافت نشد.")
+    eavesdrop_users.discard(target.id)
+    save_state()
+    await message.edit(f"👁 **شنود** برای «{target.first_name or target.id}» خاموش شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^لیست شنود$"))
+async def eavesdrop_list_command(client, message):
+    if not eavesdrop_users:
+        return await message.edit("👁 لیست شنود خالی است.")
+    lines = "\n".join(f"• <code>{uid}</code>" for uid in eavesdrop_users)
+    await message.edit(f"👁 <b>لیست شنود ({len(eavesdrop_users)}):</b>\n{lines}", parse_mode=enums.ParseMode.HTML)
+
+
+@app.on_message(filters.me & filters.regex(r"^خواندن خودکار (روشن|خاموش)$"))
+async def auto_read_command(client, message):
+    global auto_read_enabled
+    auto_read_enabled = message.text.endswith("روشن")
+    save_state()
+    await message.edit(f"👀 **خواندن خودکار** {'روشن' if auto_read_enabled else 'خاموش'} شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^خواندن همه$"))
+async def read_all_command(client, message):
+    await message.edit("👀 در حال خواندن همهٔ چت‌ها...")
+    count = 0
+    try:
+        async for dialog in client.get_dialogs():
+            try:
+                await client.read_chat_history(dialog.chat.id)
+                count += 1
+            except Exception:
+                pass
+    except Exception as e:
+        return await message.edit(f"❌ خطا: {e}")
+    await message.edit(f"✅ **{count}** چت خوانده شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^(نشست ها|نشست‌ها|گوشی ها|گوشی‌ها)$"))
+async def sessions_list_command(client, message):
+    await message.edit("📱 در حال دریافت نشست‌های فعال...")
+    try:
+        from pyrogram.raw import functions
+        auth = await client.invoke(functions.account.GetAuthorizations())
+        lines = ["📱 <b>نشست‌های فعال:</b>\n"]
+        for a in auth.authorizations:
+            current = " ✅(فعلی)" if getattr(a, "current", False) else ""
+            lines.append(
+                f"• <b>{a.device_model}</b> — {a.platform} {a.system_version}{current}\n"
+                f"  <code>{a.app_name} {a.app_version}</code> | {a.country}\n"
+                f"  🔑 hash: <code>{a.hash}</code>"
+            )
+        await message.edit("\n".join(lines), parse_mode=enums.ParseMode.HTML)
+    except Exception as e:
+        await message.edit(f"❌ خطا در دریافت نشست‌ها: {e}")
+
+
+@app.on_message(filters.me & filters.regex(r"^(پاک نشست ها|پاک نشست‌ها|بستن نشست ها)$"))
+async def sessions_reset_command(client, message):
+    await message.edit("🧹 در حال بستن سایر نشست‌ها...")
+    try:
+        from pyrogram.raw import functions
+        await client.invoke(functions.auth.ResetAuthorizations())
+        await message.edit("✅ همهٔ نشست‌های دیگر بسته شدند (به‌جز نشست فعلی).")
+    except Exception as e:
+        await message.edit(f"❌ خطا: {e}")
+
+
+@app.on_message(filters.me & filters.regex(r"^فونت رندوم (روشن|خاموش)$"))
+async def random_font_command(client, message):
+    global random_font_enabled
+    random_font_enabled = message.text.endswith("روشن")
+    save_state()
+    await message.edit(f"🔤 **فونت رندوم** {'روشن' if random_font_enabled else 'خاموش'} شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^ساعت ایموجی (روشن|خاموش)$"))
+async def emoji_clock_command(client, message):
+    global emoji_clock_enabled, emoji_clock_original_name
+    if message.text.endswith("روشن"):
+        emoji_clock_enabled = True
+        save_state()
+        ensure_time_updater(client)
+        await update_name_with_emoji_clock(client)
+        await message.edit("🕐 **ساعت ایموجی روشن شد** (کنار اسم).")
+    else:
+        emoji_clock_enabled = False
+        save_state()
+        try:
+            if emoji_clock_original_name is not None:
+                await client.update_profile(first_name=emoji_clock_original_name)
+        except Exception:
+            pass
+        await message.edit("🕐 **ساعت ایموجی خاموش شد.**")
+
+
+@app.on_message(filters.me & filters.regex(r"^محاسبه (روشن|خاموش)$"))
+async def calc_mode_command(client, message):
+    global calc_mode_enabled
+    calc_mode_enabled = message.text.endswith("روشن")
+    save_state()
+    await message.edit(f"🧮 **حالت محاسبه** {'روشن' if calc_mode_enabled else 'خاموش'} شد.\n"
+                       f"حالا هر عبارت ریاضی که بفرستی، خودکار حل می‌شود.")
+
+
 # ── آخرین هندلر گروه: فرمت‌کنندهٔ خودکارِ متنِ خروجی ─────────────────────────
 # چون آخرین هندلرِ ثبت‌شده است، فقط پیام‌هایی که هیچ دستوری آن‌ها را نگرفته را
 # پردازش می‌کند و دیگر مانع اجرای دستورها نمی‌شود.
 @app.on_message(filters.me & filters.text)
 async def auto_html_format_messages(client, message):
-    if not any(format_settings.values()):
-        return
     original_text = message.text
     if not original_text:
+        return
+
+    # حالت محاسبه: اگر کل متن یک عبارت ریاضی باشد، جواب را جای‌گزین می‌کند
+    if calc_mode_enabled and re.fullmatch(r"[\d۰-۹٠-٩\s\+\-\*/×÷\^%\(\)\.،]+", original_text.strip()) \
+            and re.search(r"[\+\-\*/×÷\^%]", original_text):
+        try:
+            result = safe_calc(original_text.strip())
+            if isinstance(result, float) and result.is_integer():
+                result = int(result)
+            await message.edit_text(f"{original_text.strip()} = {result}")
+            return
+        except Exception:
+            pass
+
+    # فونت رندوم: تبدیل حروف لاتین به فونت فانتزی
+    if random_font_enabled:
+        fancy = apply_random_font(original_text)
+        if fancy != original_text:
+            try:
+                await message.edit_text(fancy)
+            except Exception:
+                pass
+            return
+
+    if not any(format_settings.values()):
         return
     formatted_text = original_text
     for format_name, is_active in format_settings.items():
@@ -4911,6 +5224,54 @@ async def execute_command_from_helper(command, user_id):
                 pass
             return
 
+        # ── تاگل‌های سبک Self Saz از پنل هلپر ─────────────────────────────
+        if command in ("منشی روشن", "منشی خاموش"):
+            global afk_enabled
+            afk_enabled = command.endswith("روشن")
+            if afk_enabled:
+                afk_last_reply.clear()
+            save_state()
+            print(f"✅ منشی: {afk_enabled}")
+            return
+
+        if command in ("خواندن خودکار روشن", "خواندن خودکار خاموش"):
+            global auto_read_enabled
+            auto_read_enabled = command.endswith("روشن")
+            save_state()
+            print(f"✅ خواندن خودکار: {auto_read_enabled}")
+            return
+
+        if command in ("فونت رندوم روشن", "فونت رندوم خاموش"):
+            global random_font_enabled
+            random_font_enabled = command.endswith("روشن")
+            save_state()
+            print(f"✅ فونت رندوم: {random_font_enabled}")
+            return
+
+        if command in ("محاسبه روشن", "محاسبه خاموش"):
+            global calc_mode_enabled
+            calc_mode_enabled = command.endswith("روشن")
+            save_state()
+            print(f"✅ حالت محاسبه: {calc_mode_enabled}")
+            return
+
+        if command in ("ساعت ایموجی روشن", "ساعت ایموجی خاموش"):
+            global emoji_clock_enabled, emoji_clock_original_name
+            if command.endswith("روشن"):
+                emoji_clock_enabled = True
+                ensure_time_updater(app)
+                await update_name_with_emoji_clock(app)
+            else:
+                emoji_clock_enabled = False
+                try:
+                    if emoji_clock_original_name is not None:
+                        await app.update_profile(first_name=emoji_clock_original_name)
+                except Exception:
+                    pass
+            save_state()
+            print(f"✅ ساعت ایموجی: {emoji_clock_enabled}")
+            return
+
     except Exception as e:
         print(f"❌ خطا در اجرای دستور {command}: {e}")
         import traceback
@@ -4931,6 +5292,9 @@ async def restore_background_tasks():
         online_task = asyncio.create_task(keep_online(app))
 
     if bio_time_enabled:
+        ensure_time_updater(app)
+
+    if emoji_clock_enabled:
         ensure_time_updater(app)
 
     if auto_profile_enabled and auto_profile_names:
