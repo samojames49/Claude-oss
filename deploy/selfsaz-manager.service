@@ -1,0 +1,19 @@
+[Unit]
+Description=SelfSaz Manager Bot (bot.py)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# مسیر پروژه و کاربر را متناسب با سرور خودتان تغییر دهید
+WorkingDirectory=/opt/selfsaz
+User=ubuntu
+EnvironmentFile=/opt/selfsaz/.env
+ExecStart=/usr/bin/python3 /opt/selfsaz/bot.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/selfsaz/logs/manager.log
+StandardError=append:/opt/selfsaz/logs/manager.log
+
+[Install]
+WantedBy=multi-user.target
