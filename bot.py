@@ -1,181 +1,48 @@
-from pyrogram import Client, filters, enums
+from pyrogram import Client, filters, enums, idle
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ButtonStyle
-from pyrogram.errors import SessionPasswordNeeded 
+from pyrogram.errors import SessionPasswordNeeded, MessageNotModified, RPCError, UserNotParticipant
 import json, os, asyncio, subprocess, sys, time, threading, html, random, signal
+
+import config
+from db import JSONDatabase
+from payments import PaymentError, get_gateway
+
+config.require("BOT_TOKEN", "API_ID", "API_HASH", "ADMIN_ID")
 
 user_temp_codes = {}
 active_clients = {}
-BOT_TOKEN = "8172673460:AAErbvjb1Pz6WeNXcAyiOEEGDLsziYrW0dk"  # توکن ربات
-API_ID = 35982866  # api id اکانت
-API_HASH = "1931a47b5fa7bbc5e1db952beeaac578"  # api hash اکانت
-ADMIN_ID = 8641952987  # ایدی عددی مالک
-os.makedirs("sessions", exist_ok=True)
-TAX_PERCENT = 10  # 10 درصد مالیات اینم دلخواه هست میتونید تغییر بدید
-TAX_MIN_AMOUNT = 2  # حداقل مبلغ برای مالیات دلخواه هست میتونید تغییر بدید
+BOT_TOKEN = config.BOT_TOKEN
+API_ID = config.API_ID
+API_HASH = config.API_HASH
+ADMIN_ID = config.ADMIN_ID
+TAX_PERCENT = config.TAX_PERCENT
+TAX_MIN_AMOUNT = config.TAX_MIN_AMOUNT
+FORCE_CHANNELS = config.FORCE_CHANNELS
+COIN_RATE = config.COIN_RATE
+TOMAN_PER_COIN = config.TOMAN_PER_COIN
+card_info = config.card_info
+SESSIONS_DIR = config.SESSIONS_DIR
+SELF_SCRIPT = config.SELF_SCRIPT
 
-FORCE_CHANNELS = [
-    "siahkadeh",
-    "creeps_self",
-    "creeps_team"
-]
-
-
-COIN_RATE = 1440  # 1440 سکه = 50,000 تومان
-TOMAN_PER_COIN = 50000 / 1440
-card_info = {
-                "card_number": "6063-7313-0241-4108",
-                "card_owner": "نازنین عبدلی",
-                "bank_name": "بانک قرض الحسنه مهر ایران"
-            }
-
+os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 bot = Client("bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
 
-class JSONDatabase:
-    def __init__(self, filename="database.json"):
-        self.filename = filename
-        self.data = self.load_data()
-    
-    def load_data(self):
-        try:
-            if os.path.exists(self.filename):
-                with open(self.filename, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if "settings" not in data:
-                        data["settings"] = {
-                            "coin_rate": COIN_RATE,
-                            "toman_per_coin": TOMAN_PER_COIN,
-                            "admin_id": ADMIN_ID,
-                            "tax_percent": TAX_PERCENT,
-                            "tax_min_amount": TAX_MIN_AMOUNT,
-                            "transfer_enabled": True
-                        }
-                        self.save_data(data)
-                    return data
-            else:
-                initial_data = {
-                    "users": {}, 
-                    "processes": {}, 
-                    "temp_data": {}, 
-                    "credits": {}, 
-                    "timers": {},
-                    "verifications": {},
-                    "payments": {},
-                    "group_bets": {},
-                    "settings": {
-                        "coin_rate": COIN_RATE,
-                        "toman_per_coin": TOMAN_PER_COIN,
-                        "admin_id": ADMIN_ID,
-                        "tax_percent": TAX_PERCENT,
-                        "tax_min_amount": TAX_MIN_AMOUNT,
-                        "transfer_enabled": True
-                    }
-                }
-                self.save_data(initial_data)
-                return initial_data
-        except Exception as e:
-            return {
-                "users": {}, "processes": {}, "temp_data": {}, 
-                "credits": {}, "timers": {}, "verifications": {}, 
-                "payments": {}, "group_bets": {},
-                "settings": {
-                    "coin_rate": COIN_RATE,
-                    "toman_per_coin": TOMAN_PER_COIN,
-                    "admin_id": ADMIN_ID,
-                    "tax_percent": TAX_PERCENT,
-                    "tax_min_amount": TAX_MIN_AMOUNT,
-                    "transfer_enabled": True
-                }
-            }
-
-    def save_data(self, data=None):
-        try:
-            if data: 
-                self.data = data
-            with open(self.filename, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=4, ensure_ascii=False)
-            return True
-        except Exception as e:
-            return False
-    def get_welcome_photo(self):
-        return self.get("settings", "welcome_photo_id", None)
-
-    def set_welcome_photo(self, photo_id):
-        return self.set("settings", "welcome_photo_id", photo_id)
-
-    def delete_welcome_photo(self):
-        return self.delete("settings", "welcome_photo_id")    
-    def get(self, category, key, default=None):
-        try:
-            return self.data.get(category, {}).get(str(key), default)
-        except:
-            return default
-    
-    def set(self, category, key, value):
-        try:
-            if category not in self.data: 
-                self.data[category] = {}
-            self.data[category][str(key)] = value
-            return self.save_data()
-        except Exception as e:
-            return False
-    
-    def delete(self, category, key):
-        try:
-            if category in self.data and str(key) in self.data[category]:
-                del self.data[category][str(key)]
-                return self.save_data()
-            return False
-        except Exception as e:
-            return False  
-    
-    def get_all(self, category):
-        try:
-            return self.data.get(category, {})
-        except:
-            return {}
-    
-    def get_pending_verifications(self):
-        try:
-            verifications = self.data.get("verifications", {})
-            return {k: v for k, v in verifications.items() if v.get('status') == 'pending'}
-        except:
-            return {}
-    
-    def get_pending_payments(self):
-        try:
-            payments = self.data.get("payments", {})
-            return {k: v for k, v in payments.items() if v.get('status') == 'pending'}
-        except:
-            return {}
-    
-    def get_verified_users(self):
-        try:
-            users = self.data.get("users", {})
-            return {k: v for k, v in users.items() if v.get('verified')}
-        except:
-            return {}
-    
-    def get_rejected_users(self):
-        try:
-            users = self.data.get("users", {})
-            return {k: v for k, v in users.items() if v.get('rejected')}
-        except:
-            return {}
-    
-    def set_transfer_status(self, enabled):
-        if "settings" not in self.data:
-            self.data["settings"] = {}
-        self.data["settings"]["transfer_enabled"] = enabled
-        return self.save_data()
-    
-    def get_transfer_status(self):
-        settings = self.data.get("settings", {})
-        return settings.get("transfer_enabled", True)
-
-db = JSONDatabase()
+db = JSONDatabase(
+    config.DATABASE_FILE,
+    defaults={
+        "coin_rate": COIN_RATE,
+        "toman_per_coin": TOMAN_PER_COIN,
+        "admin_id": ADMIN_ID,
+        "tax_percent": TAX_PERCENT,
+        "tax_min_amount": TAX_MIN_AMOUNT,
+        "transfer_enabled": True,
+    },
+)
 user_timers = {}
+# اشیای Popen سلف هر کاربر؛ اجازه می‌دهد دقیقاً همان پروسه را ببندیم
+selfbot_processes = {}
 
 class UserTimer:
     def __init__(self, user_id, callback):
@@ -211,6 +78,26 @@ FONTS = {
     '8': '𝟴',
     '9': '𝟵'
 }
+
+async def safe_edit(callback_query, text, reply_markup=None, parse_mode=None):
+    """ویرایش پیام پنل بدون توجه به اینکه عکس‌دار است یا متنی.
+
+    اگر پیام عکس داشته باشد، `edit_message_text` از سمت تلگرام خطا می‌دهد؛
+    باید کپشن ویرایش شود.
+    """
+    message = callback_query.message
+    try:
+        if message.photo:
+            await message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        else:
+            await message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return True
+    except MessageNotModified:
+        return True
+    except RPCError as error:
+        print(f"⚠️ ویرایش پیام ناموفق بود: {error}")
+        return False
+
 
 def font_convert(text):
     if text is None:
@@ -563,195 +450,350 @@ async def finish_group_bet(client, bet_key):
                 )
             except:
                 pass
-async def check_force_join(client, user_id):
-    not_joined = []
+JOINED_STATUSES = (
+    enums.ChatMemberStatus.OWNER,
+    enums.ChatMemberStatus.ADMINISTRATOR,
+    enums.ChatMemberStatus.MEMBER,
+    enums.ChatMemberStatus.RESTRICTED,
+)
 
+
+async def check_force_join(client, user_id):
+    """بررسی عضویت در کانال‌های اجباری.
+
+    نسخه قبلی فقط وضعیت kicked/banned را رد می‌کرد؛ یعنی کاربری که کانال را
+    ترک کرده بود (LEFT) از فیلتر رد می‌شد. اینجا فقط وضعیت‌های واقعاً «عضو»
+    پذیرفته می‌شوند.
+    """
+    if not FORCE_CHANNELS:
+        return True, []
+
+    not_joined = []
     for ch in FORCE_CHANNELS:
         try:
             member = await client.get_chat_member(ch, user_id)
-            if member.status in ("kicked", "banned"):
+            if member.status not in JOINED_STATUSES:
                 not_joined.append(ch)
-        except:
+        except UserNotParticipant:
+            not_joined.append(ch)
+        except RPCError as error:
+            print(f"⚠️ بررسی عضویت @{ch} ناموفق بود: {error}")
             not_joined.append(ch)
 
     if not_joined:
         return False, not_joined
-    
+
     return True, []
 
-def deduct_credit_callback(user_id):
+BOT_LOOP = None  # حلقه رویداد اصلی؛ در on_startup مقدار می‌گیرد
+
+
+def schedule_on_bot_loop(coro):
+    """اجرای یک کوروتین از داخل ترد غیر-async (مثل تایمر شارژ).
+
+    قبلاً `bot.send_message(...)` بدون await صدا زده می‌شد؛ یعنی کوروتین ساخته
+    می‌شد ولی هیچ‌وقت اجرا نمی‌شد و کاربر پیام «سکه تمام شد» را نمی‌گرفت.
+    """
+    if BOT_LOOP is None or BOT_LOOP.is_closed():
+        coro.close()
+        return None
     try:
-        if not db.get("processes", user_id): 
+        return asyncio.run_coroutine_threadsafe(coro, BOT_LOOP)
+    except RuntimeError as error:
+        print(f"⚠️ ارسال پیام ممکن نشد: {error}")
+        coro.close()
+        return None
+
+
+def notify_user(user_id, text):
+    schedule_on_bot_loop(bot.send_message(user_id, text))
+
+
+OUT_OF_CREDIT_TEXT = (
+    "❌ **سکه های شما تمام شد!**\n\n"
+    "سلف بات متوقف شد.\n\n"
+    "💰 برای ادامه استفاده، از طریق منوی «افزایش موجودی» حساب خود را شارژ کنید."
+)
+
+
+def deduct_credit_callback(user_id):
+    """کسر یک سکه به ازای هر ساعت اجرای سلف."""
+    try:
+        if not db.get("processes", user_id):
             return
-        credits = db.get("credits", user_id, 0)
-        if credits > 0:
-            new_credits = credits - 1
-            db.set("credits", user_id, new_credits)
-            if new_credits <= 0:
-                stop_selfbot(user_id)
-                db.set("credits", user_id, 0) 
-                try: 
-                    bot.send_message(
-                        user_id, 
-                        "❌ **سکه های شما تمام شد!**\n\n"
-                        "سلف بات متوقف شد.\n\n"
-                        "💰 برای ادامه استفاده، از طریق منوی «افزایش موجودی» حساب خود را شارژ کنید."
-                    )
-                except: 
-                    pass
-            else:
-                if user_id in user_timers: 
-                    user_timers[user_id].start()
-        else:
+
+        spent, remaining = db.spend_credits(user_id, 1)
+        if not spent or remaining <= 0:
             stop_selfbot(user_id)
-            db.set("credits", user_id, 0)
-            try: 
-                bot.send_message(
-                    user_id, 
-                    "❌ **سکه های شما تمام شد!**\n\n"
-                    "سلف بات متوقف شد.\n\n"
-                    "💰 برای ادامه استفاده، از طریق منوی «افزایش موجودی» حساب خود را شارژ کنید."
-                )
-            except: 
-                pass
+            notify_user(user_id, OUT_OF_CREDIT_TEXT)
+            return
+
+        if user_id in user_timers:
+            user_timers[user_id].start()
     except Exception as e:
         print(f"❌ خطا در deduct_credit_callback: {e}")
+
 
 def run_selfbot(user_id, phone=None):
     try:
         stop_selfbot(user_id)
 
+        session_file = os.path.join(SESSIONS_DIR, f"{user_id}.session")
+        if not os.path.exists(session_file):
+            print(f"⚠️ فایل session کاربر {user_id} موجود نیست؛ اجرا لغو شد.")
+            return False
+
         if phone:
-            cmd = [sys.executable, "self.py", str(user_id), phone, str(API_ID), API_HASH]
+            cmd = [sys.executable, SELF_SCRIPT, str(user_id), phone, str(API_ID), API_HASH]
         else:
-            cmd = [sys.executable, "self.py", str(user_id)]
-        
+            cmd = [sys.executable, SELF_SCRIPT, str(user_id)]
+
         process = subprocess.Popen(cmd)
         pid = process.pid
+        selfbot_processes[user_id] = process
         db.set("processes", user_id, pid)
-        user_data = db.get("users", user_id, {})
+
+        user_data = db.get("users", user_id, {}) or {}
         user_data["status"] = "active"
         user_data["last_active"] = time.time()
+        user_data["started_at"] = time.time()
         if phone:
             user_data["phone"] = phone
         db.set("users", user_id, user_data)
-        
-        with open(f"process_{user_id}.pid", "w") as f:
-            f.write(str(pid))
-        
+
         print(f"✅ سلف‌بات برای کاربر {user_id} راه‌اندازی شد")
         print(f"   📱 شماره: {phone}")
         print(f"   🆔 PID: {pid}")
-        print(f"   💰 سکه: {db.get('credits', user_id, 0)}")
+        print(f"   💰 سکه: {db.get_credits(user_id)}")
         print("-" * 50)
-        
+
         if user_id not in user_timers:
             user_timers[user_id] = UserTimer(user_id, deduct_credit_callback)
         user_timers[user_id].start()
-        
+
         return True
     except Exception as e:
         print(f"❌ خطا در اجرای سلف‌بات: {e}")
         return False
 
+
+def _terminate_pid(pid):
+    """پایان دادن به یک پروسه مشخص با PID.
+
+    نکته مهم: نسخه قبلی در انتها `pkill -f "self.py"` اجرا می‌کرد که سلف **همه**
+    مشتری‌ها را می‌کشت. اینجا فقط همان PID هدف قرار می‌گیرد.
+    """
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        print(f"⚠️ اجازه پایان دادن به پروسه {pid} وجود ندارد")
+        return False
+    except OSError as error:
+        print(f"⚠️ خطا در ارسال SIGTERM به {pid}: {error}")
+
+    for _ in range(20):  # حداکثر ۲ ثانیه فرصت خروج تمیز
+        time.sleep(0.1)
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return True
+
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+    return True
+
+
 def stop_selfbot(user_id):
     try:
         if user_id in user_timers:
             user_timers[user_id].stop()
-            if not db.get("users", user_id): 
-                del user_timers[user_id]
-        
+
+        process = selfbot_processes.pop(user_id, None)
         pid = db.get("processes", user_id)
-        if pid:
+
+        if process is not None and process.poll() is None:
+            _terminate_pid(process.pid)
             try:
-                import os
-                import signal
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    time.sleep(0.5)
-                except:
-                    pass
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except:
-                    pass
-                try:
-                    import subprocess
-                    subprocess.run(["pkill", "-f", f"self.py {user_id}"], 
-                                 capture_output=True, check=False)
-                    subprocess.run(["pkill", "-f", "self.py"], 
-                                 capture_output=True, check=False)
-                except:
-                    pass
-                
-            except Exception as e:
-                print(f"⚠️ خطا در قطع پروسس: {e}")
-            
-            db.delete("processes", user_id)
-            user_data = db.get("users", user_id, {})
-            if user_data:
-                user_data["status"] = "inactive"
-                db.set("users", user_id, user_data)
-            
-            try:
-                os.remove(f"process_{user_id}.pid")
-            except:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
                 pass
-            
-            print(f"✅ سلف‌بات کاربر {user_id} قطع شد (PID: {pid})")
-            return True
-        
-        try:
-            import subprocess
-            subprocess.run(["pkill", "-f", f"self.py {user_id}"], check=False)
-            subprocess.run(["pkill", "-f", "self.py"], check=False)
-            db.delete("processes", user_id)
-            user_data = db.get("users", user_id, {})
-            if user_data:
-                user_data["status"] = "inactive"
-                db.set("users", user_id, user_data)
-            
-            print(f"✅ سلف‌بات کاربر {user_id} قطع شد (از طریق pkill)")
-            return True
-        except:
-            pass
-            
-        return False
+        elif pid:
+            _terminate_pid(pid)
+
+        if process is None and not pid:
+            return False
+
+        db.delete("processes", user_id)
+        user_data = db.get("users", user_id, {}) or {}
+        if user_data:
+            user_data["status"] = "inactive"
+            user_data["stopped_at"] = time.time()
+            db.set("users", user_id, user_data)
+
+        legacy_pid_file = f"process_{user_id}.pid"
+        if os.path.exists(legacy_pid_file):
+            try:
+                os.remove(legacy_pid_file)
+            except OSError:
+                pass
+
+        print(f"✅ سلف‌بات کاربر {user_id} قطع شد (PID: {pid})")
+        return True
     except Exception as e:
         print(f"❌ خطا در stop_selfbot: {e}")
         return False
 
+
 def check_selfbot_status(user_id):
+    """آیا پروسه سلف این کاربر واقعاً زنده است؟"""
     pid = db.get("processes", user_id)
     if not pid:
-        return False    
-    try:
-        import os
-        os.kill(pid, 0) 
-        return True
-    except OSError:
+        return False
+
+    process = selfbot_processes.get(user_id)
+    if process is not None and process.poll() is not None:
+        alive = False
+    else:
+        try:
+            os.kill(pid, 0)
+            alive = True
+        except OSError:
+            alive = False
+
+    if not alive:
+        selfbot_processes.pop(user_id, None)
         db.delete("processes", user_id)
-        user_data = db.get("users", user_id, {})
+        user_data = db.get("users", user_id, {}) or {}
         if user_data:
             user_data["status"] = "inactive"
             db.set("users", user_id, user_data)
-        return False
-        
+    return alive
+
+
 def stop_all_selfbots():
     try:
-        for timer in list(user_timers.values()): 
+        for timer in list(user_timers.values()):
             timer.stop()
         user_timers.clear()
-        for pid in db.data.get("processes", {}).values():
-            try: 
-                import psutil
-                psutil.Process(pid).terminate()
-            except: 
-                pass
-        db.data["processes"], db.data["timers"] = {}, {}
-        db.save_data()
-    except: 
-        pass
+
+        for user_id_str, pid in list(db.get_all("processes").items()):
+            try:
+                _terminate_pid(int(pid))
+            except (TypeError, ValueError):
+                continue
+            user_data = db.get("users", user_id_str, {}) or {}
+            if user_data:
+                user_data["status"] = "inactive"
+                db.set("users", user_id_str, user_data)
+
+        selfbot_processes.clear()
+        with db.atomic() as data:
+            data["processes"] = {}
+            data["timers"] = {}
+        print("✅ همه سلف‌بات‌ها متوقف شدند")
+    except Exception as e:
+        print(f"❌ خطا در stop_all_selfbots: {e}")
+
+
+def restore_running_selfbots():
+    """بازیابی وضعیت پس از ری‌استارت ربات مدیریت.
+
+    نسخه قبلی بعد از ری‌استارت، هم PIDهای مرده را «فعال» نشان می‌داد و هم
+    تایمر شارژ ساعتی را از دست می‌داد (یعنی سلف بدون کسر سکه اجرا می‌شد).
+    """
+    revived, cleaned = 0, 0
+    for user_id_str in list(db.get_all("processes").keys()):
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            db.delete("processes", user_id_str)
+            continue
+
+        if check_selfbot_status(user_id):
+            if user_id not in user_timers:
+                user_timers[user_id] = UserTimer(user_id, deduct_credit_callback)
+            user_timers[user_id].start()
+            revived += 1
+            continue
+
+        cleaned += 1
+        if config.AUTO_RESTART_ENABLED and db.get_credits(user_id) > 0:
+            phone = (db.get("users", user_id, {}) or {}).get("phone")
+            if run_selfbot(user_id, phone):
+                print(f"♻️ سلف کاربر {user_id} پس از ری‌استارت مجدداً اجرا شد")
+
+    if revived or cleaned:
+        print(f"📋 بازیابی وضعیت: {revived} سلف فعال، {cleaned} رکورد مرده پاک‌سازی شد")
+
+
+async def health_monitor_loop():
+    """گزارش سلامت ساعتی به ادمین + اجرای خودکار سلف‌های افتاده.
+
+    این همان قابلیت «گزارش ساعتی و روشن‌شدن خودکار سلف‌ها» است که سرویس‌های
+    حرفه‌ای مثل Self VTR دارند.
+    """
+    interval = max(60, config.HEALTH_REPORT_INTERVAL)
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            await run_health_check(send_report=True)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"❌ خطا در health_monitor_loop: {e}")
+
+
+async def run_health_check(send_report=False):
+    """بررسی همه سلف‌ها؛ افتاده‌ها را (در صورت داشتن سکه) دوباره اجرا می‌کند."""
+    processes = db.get_all("processes")
+    users = db.get_all("users")
+
+    alive, restarted, stopped = 0, 0, 0
+    for user_id_str in list(users.keys()):
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            continue
+
+        user_data = users.get(user_id_str, {}) or {}
+        if user_data.get("status") != "active" and user_id_str not in processes:
+            continue
+
+        if check_selfbot_status(user_id):
+            alive += 1
+            continue
+
+        if config.AUTO_RESTART_ENABLED and db.get_credits(user_id) > 0:
+            phone = user_data.get("phone")
+            if run_selfbot(user_id, phone):
+                restarted += 1
+        else:
+            stop_selfbot(user_id)
+            stopped += 1
+
+    if send_report and ADMIN_ID:
+        total_users = len(users)
+        active_now = len(db.get_all("processes"))
+        report = (
+            "📊 <b>گزارش ساعتی سلف‌ها</b>\n\n"
+            f"👥 کل کاربران: <b>{total_users}</b>\n"
+            f"🟢 سلف‌های فعال: <b>{active_now}</b>\n"
+            f"✅ سالم: <b>{alive}</b>\n"
+            f"♻️ اجرای مجدد: <b>{restarted}</b>\n"
+            f"🛑 متوقف‌شده: <b>{stopped}</b>"
+        )
+        try:
+            await bot.send_message(ADMIN_ID, report)
+        except Exception as e:
+            print(f"⚠️ ارسال گزارش سلامت ناموفق بود: {e}")
+
+    return {"alive": alive, "restarted": restarted, "stopped": stopped}
+
+
 @bot.on_message(filters.group & filters.regex(r'^موجودی$'))
 async def group_balance_handler(client, message: Message):
     user_id = message.from_user.id
@@ -825,15 +867,15 @@ async def group_bet_handler(client, message: Message):
     if amount <= 0:
         await message.reply_text("❌ مقدار شرط باید بیشتر از صفر باشد.")
         return    
-    creator_credits = db.get("credits", creator_id, 0)
-    if creator_credits < amount:
+    # چک و کسر اتمیک تا با ساخت هم‌زمان چند شرط، موجودی منفی نشود
+    spent, creator_credits = db.spend_credits(creator_id, amount)
+    if not spent:
         await message.reply_text(
             f"❌ سکه کافی برای ساخت شرط ندارید.\n"
             f"💰 موجودی شما: {creator_credits} سکه"
         )
         return
-    
-    db.set("credits", creator_id, creator_credits - amount)
+
     creator_first_name = html.escape(message.from_user.first_name or 'کاربر')
     creator_mention = f'<a href="tg://user?id={creator_id}"><b>{creator_first_name}</b></a>'
 
@@ -1073,6 +1115,11 @@ async def user_info(client, message: Message):
 
 @bot.on_message(filters.command("admin") & filters.user(ADMIN_ID))
 async def admin_panel(client, message: Message):
+    # هر بار باز شدن پنل، حالت‌های در انتظار ادمین پاک می‌شود تا پیام بعدی
+    # به‌اشتباه به‌عنوان پیام همگانی یا تنظیم سکه تفسیر نشود.
+    db.delete("temp_data", f"admin_broadcast_{ADMIN_ID}")
+    db.delete("temp_data", f"admin_set_{ADMIN_ID}")
+
     users = db.data.get("users", {})
     active_count = len(db.data.get("processes", {}))
     total_credits = sum(db.data.get("credits", {}).values())
@@ -1126,6 +1173,10 @@ async def admin_panel(client, message: Message):
         ],
         [
             InlineKeyboardButton("📸 تنظیم عکس خوش‌آمدگویی", callback_data="admin_set_photo", style=ButtonStyle.PRIMARY)
+        ],
+        [
+            InlineKeyboardButton("📢 پیام همگانی", callback_data="admin_broadcast", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("♻️ بررسی سلامت سلف‌ها", callback_data="admin_health", style=ButtonStyle.SUCCESS)
         ]
     ])
     
@@ -1433,6 +1484,31 @@ async def admin_callback_handler(client, callback_query):
     elif data == "admin_back":
         await admin_panel(client, callback_query.message)
         await callback_query.answer()
+
+    elif data == "admin_broadcast":
+        db.set("temp_data", f"admin_broadcast_{user_id}", True)
+        await callback_query.message.edit_text(
+            "📢 **پیام همگانی**\n\n"
+            "پیام مورد نظر خود را ارسال کنید تا برای همه کاربران فرستاده شود.\n"
+            "برای لغو، /admin را بزنید.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 انصراف", callback_data="admin_back")]
+            ])
+        )
+        await callback_query.answer()
+
+    elif data == "admin_health":
+        await callback_query.answer("⏳ در حال بررسی...")
+        result = await run_health_check(send_report=False)
+        await callback_query.message.edit_text(
+            "♻️ **نتیجه بررسی سلامت سلف‌ها**\n\n"
+            f"✅ سالم: `{result['alive']}`\n"
+            f"♻️ اجرای مجدد: `{result['restarted']}`\n"
+            f"🛑 متوقف‌شده: `{result['stopped']}`",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 بازگشت", callback_data="admin_back")]
+            ])
+        )
     
     elif data.startswith("set_"):
         target_id = int(data.split("_")[1])
@@ -1493,29 +1569,38 @@ async def admin_callback_handler(client, callback_query):
     
     elif data.startswith("payment_approve_"):
         target_id = int(data.split("_")[2])
-        payment_data = db.get("payments", target_id)
-        if payment_data:
-            coins = payment_data.get("coins", 0)
-            current = db.get("credits", target_id, 0)
-            db.set("credits", target_id, current + coins)
-            payment_data["status"] = "approved"
-            db.set("payments", target_id, payment_data)
-            
-            await callback_query.message.edit_text(
-                f"✅ پرداخت کاربر {target_id} تایید شد.\n"
-                f"💰 {coins} سکه به حسابش اضافه شد."
-            )
-            try:
-                await bot.send_message(
-                    target_id,
-                    f"✅ **پرداخت شما تایید شد!**\n\n"
-                    f"💰 {coins} سکه به حساب شما اضافه شد.\n"
-                    f"📊 موجودی جدید: {db.get('credits', target_id, 0)} سکه"
-                )
-            except:
-                pass
-        else:
+        # چک-و-ثبت وضعیت در یک قفل تا با دوبار کلیک، سکه دوباره واریز نشود
+        with db.atomic() as data_store:
+            payment_data = data_store.get("payments", {}).get(str(target_id))
+            already = payment_data and payment_data.get("status") == "approved"
+            if payment_data and not already:
+                payment_data["status"] = "approved"
+                payment_data["approved_at"] = time.time()
+
+        if not payment_data:
             await callback_query.message.edit_text(f"❌ اطلاعات پرداخت کاربر {target_id} یافت نشد.")
+            await callback_query.answer()
+            return
+        if already:
+            await callback_query.answer("ℹ️ این پرداخت قبلاً تایید شده بود.", show_alert=True)
+            return
+
+        coins = payment_data.get("coins", 0)
+        new_balance = db.add_credits(target_id, coins)
+
+        await callback_query.message.edit_text(
+            f"✅ پرداخت کاربر {target_id} تایید شد.\n"
+            f"💰 {coins} سکه به حسابش اضافه شد."
+        )
+        try:
+            await bot.send_message(
+                target_id,
+                f"✅ **پرداخت شما تایید شد!**\n\n"
+                f"💰 {coins} سکه به حساب شما اضافه شد.\n"
+                f"📊 موجودی جدید: {new_balance} سکه"
+            )
+        except Exception:
+            pass
         await callback_query.answer()
     
     elif data.startswith("payment_reject_"):
@@ -1538,182 +1623,116 @@ async def admin_callback_handler(client, callback_query):
             await callback_query.message.edit_text(f"❌ اطلاعات پرداخت کاربر {target_id} یافت نشد.")
         await callback_query.answer()
         
-@bot.on_message(filters.command("set") & filters.user(ADMIN_ID))
-async def set_credits(client, message: Message):
-    if len(message.command) != 3:
-        await message.reply_text("❌ فرمت: `/set آیدی تعداد`")
-        return
-    
-    try:
-        target_id = int(message.command[1])
-        amount = int(message.command[2])
-        db.set("credits", target_id, amount)
-        
-        await message.reply_text(f"✅ سکه کاربر {target_id} تنظیم شد به {amount}")        
+async def broadcast_to_all_users(message):
+    """ارسال پیام ادمین به همه کاربران ثبت‌شده."""
+    users = db.get_all("users")
+    sent, failed = 0, 0
+    status = await message.reply_text(f"📤 در حال ارسال به {len(users)} کاربر...")
+
+    for user_id_str in list(users.keys()):
         try:
-            await bot.send_message(target_id, f"🔧 موجودی سکه شما تنظیم شد\n💰 جدید: {amount} سکه")
-        except: 
-            pass        
-    except: 
-        await message.reply_text("❌ آیدی/تعداد باید عدد باشد")
+            await message.copy(int(user_id_str))
+            sent += 1
+        except (ValueError, RPCError):
+            failed += 1
+        except Exception:
+            failed += 1
+        # جلوگیری از محدودیت نرخ تلگرام
+        await asyncio.sleep(0.05)
 
-@bot.on_message(filters.command("user") & filters.user(ADMIN_ID))
-async def user_info(client, message: Message):
-    if len(message.command) != 2:
-        await message.reply_text("❌ فرمت: `/user آیدی`")
-        return    
+    await status.edit_text(
+        f"✅ **پیام همگانی ارسال شد**\n\n"
+        f"📨 موفق: `{sent}`\n"
+        f"⚠️ ناموفق: `{failed}`"
+    )
+
+
+async def verify_online_payment(client, callback_query):
+    """تایید و واریز آنی پرداخت درگاه (با محافظت در برابر دوبار واریز)."""
+    user_id = callback_query.from_user.id
+    target_id = int(callback_query.data.split("_")[1])
+
+    if user_id != target_id and user_id != ADMIN_ID:
+        await callback_query.answer("❌ دسترسی غیرمجاز!", show_alert=True)
+        return
+
+    gateway = get_gateway()
+    if gateway is None:
+        await callback_query.answer("❌ درگاه پرداخت فعال نیست.", show_alert=True)
+        return
+
+    payment_data = db.get("payments", target_id)
+    if not payment_data or not payment_data.get("authority"):
+        await callback_query.answer("❌ تراکنشی برای بررسی یافت نشد.", show_alert=True)
+        return
+    if payment_data.get("status") == "approved":
+        await callback_query.answer("ℹ️ این پرداخت قبلاً واریز شده است.", show_alert=True)
+        return
+
+    await callback_query.answer("⏳ در حال بررسی پرداخت...")
     try:
-        target_id = int(message.command[1])
-        user_data = db.get("users", target_id, {})
-        credits = db.get("credits", target_id, 0)
-        process = db.get("processes", target_id)
-        timer = db.get("timers", target_id)
-        
-        if not user_data:
-            await message.reply_text("❌ کاربر یافت نشد")
-            return
-        
-        status = "🟢 فعال" if user_data.get('status') == 'active' else "🔴 غیرفعال"
-        phone = user_data.get('phone', '❌ ثبت نشده')
-        created = time.ctime(user_data.get('created_at', time.time()))
-        running = "🟢 بله" if process else "🔴 خیر"
-        has_timer = "🟢 فعال" if timer and timer.get('is_running') else "🔴 غیرفعال"
-        verified_status = "✅ تایید شده" if user_data.get('verified') else "❌ تایید نشده"
-        rejected_status = "❌ رد شده" if user_data.get('rejected') else "✅ فعال"
-        
-        created_time = user_data.get('created_at', time.time())
-        time_diff = time.time() - created_time
-        days = int(time_diff // 86400)
-        hours = int((time_diff % 86400) // 3600)
-        
-        info_text = f"""
-👤 **اطلاعات کاربر {target_id}**
+        ok, ref_id = await gateway.verify_payment(
+            payment_data["authority"], int(round(payment_data.get("toman", 0)))
+        )
+    except PaymentError as error:
+        await safe_edit(
+            callback_query,
+            f"❌ پرداخت تایید نشد: {error}\n\nاگر مبلغ کسر شده، تا ۷۲ ساعت به‌صورت خودکار بازمی‌گردد.",
+        )
+        return
 
-📱 **شماره:** `{phone}`
-📊 **وضعیت:** {status}
-🔐 **احراز هویت:** {verified_status}
-🚫 **وضعیت رد:** {rejected_status}
-💰 **سکه ها:** `{credits}`
-🔄 **سلف:** {running}
-📅 **تاریخ ایجاد:** `{created}`
-⏳ **عضو شده:** {days} روز و {hours} ساعت
+    if not ok:
+        await callback_query.answer("❌ پرداخت هنوز تایید نشده است.", show_alert=True)
+        return
 
-⏱ **زمان باقی‌مانده:** `{credits}` ساعت
-💸 **مصرف سکه:** 1 سکه در ساعت
-"""
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎯 تنظیم سکه", callback_data=f"set_{target_id}"),
-             InlineKeyboardButton("🛑 توقف سلف", callback_data=f"stop_{target_id}")],
-            [InlineKeyboardButton("✅ تایید احراز", callback_data=f"verify_approve_{target_id}"),
-             InlineKeyboardButton("❌ رد احراز", callback_data=f"verify_reject_{target_id}")]
-        ])
-        
-        await message.reply_text(info_text, reply_markup=keyboard)        
-    except: 
-        await message.reply_text("❌ آیدی باید عدد باشد")
+    # ثبت اتمیک وضعیت تا کلیک دوباره باعث واریز مجدد نشود
+    with db.atomic() as data_store:
+        record = data_store.get("payments", {}).get(str(target_id))
+        already = record and record.get("status") == "approved"
+        if record and not already:
+            record["status"] = "approved"
+            record["ref_id"] = ref_id
+            record["approved_at"] = time.time()
+    if already:
+        await callback_query.answer("ℹ️ این پرداخت قبلاً واریز شده است.", show_alert=True)
+        return
 
-@bot.on_message(filters.command("admin") & filters.user(ADMIN_ID))
-async def admin_panel(client, message: Message):
-    users = db.data.get("users", {})
-    active_count = len(db.data.get("processes", {}))
-    total_credits = sum(db.data.get("credits", {}).values())
-    verified_users = len(db.get_verified_users())
-    pending_verifications = len(db.get_pending_verifications())
-    pending_payments = len(db.get_pending_payments())
-    
-    today = time.time() - 86400
-    new_today = sum(1 for user_data in users.values() if user_data.get('created_at', 0) > today)
-    
-    stats_text = f"""
-🛠 **پنل مدیریت ادمین**
+    coins = payment_data.get("coins", 0)
+    new_balance = db.add_credits(target_id, coins)
+    await safe_edit(
+        callback_query,
+        f"✅ **پرداخت با موفقیت انجام شد!**\n\n"
+        f"💰 {coins} سکه به حساب شما اضافه شد.\n"
+        f"📊 موجودی جدید: {new_balance} سکه\n"
+        f"🧾 کد پیگیری: `{ref_id}`",
+    )
 
-👥 **کل کاربران:** `{len(users)}`
-🟢 **کاربران فعال:** `{active_count}`
-✅ **کاربران تایید شده:** `{verified_users}`
-🆕 **کاربران امروز:** `{new_today}`
-💰 **مجموع سکه ها:** `{total_credits}`
 
-📋 **درخواست‌های در انتظار:**
-├─ 🔐 احراز هویت: `{pending_verifications}`
-└─ 💰 پرداخت: `{pending_payments}`
-
-**📋 دستورات سریع:**
-`/set آیدی تعداد` - تنظیم سکه
-`/user آیدی` - اطلاعات کاربر
-`/admin` - این پنل
-"""
-    
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-            "👥 لیست کاربران",
-                callback_data="admin_list",
-                style=ButtonStyle.PRIMARY  # آبی
-            ),
-            InlineKeyboardButton(
-            "📊 آمار کامل",
-                callback_data="admin_stats",
-                style=ButtonStyle.PRIMARY  # آبی
-            )
-        ],
-        [
-            InlineKeyboardButton(
-            "💰 برترین کاربران",
-                callback_data="admin_top",
-                style=ButtonStyle.SUCCESS  # سبز
-            ),
-            InlineKeyboardButton(
-            "🛑 توقف همه",
-                callback_data="admin_stop_all",
-                style=ButtonStyle.DANGER  # قرمز
-            )
-        ],
-        [
-            InlineKeyboardButton(
-            "🔐 درخواست احراز",
-                callback_data="admin_verifications",
-                style=ButtonStyle.PRIMARY  # آبی
-            ),
-            InlineKeyboardButton(
-            "💳 درخواست پرداخت",
-                callback_data="admin_payments",
-                style=ButtonStyle.PRIMARY  # آبی
-            )
-        ],
-        [
-            InlineKeyboardButton(
-            "🔄 روشن کردن انتقال",
-                callback_data="admin_transfer_on",
-                style=ButtonStyle.SUCCESS  # سبز
-            ),
-            InlineKeyboardButton(
-            "⛔ خاموش کردن انتقال",
-                callback_data="admin_transfer_off",
-                style=ButtonStyle.DANGER  # قرمز
-            )
-        ]
-    ])
-    
-    await message.reply_text(stats_text, reply_markup=keyboard)
 @bot.on_callback_query()
 async def callback_handler(client, callback_query):
     user_id = callback_query.from_user.id
     data = callback_query.data
     
+    # دکمه‌های موقتِ پیش از ارسال پیام به شکل joinbet_{chat_id}_waiting هستند،
+    # پس مقایسه با رشته ثابت "joinbet_waiting" هیچ‌وقت درست نمی‌شد.
     if data.startswith("joinbet_"):
-        if data == "joinbet_waiting":
+        if data.endswith("_waiting"):
             await callback_query.answer("⏳ لطفا چند لحظه صبر کنید...", show_alert=True)
             return
         await join_group_bet_handler(client, callback_query)
         return
     
     if data.startswith("cancelbet_"):
-        if data == "cancelbet_waiting":
+        if data.endswith("_waiting"):
             await callback_query.answer("⏳ لطفا چند لحظه صبر کنید...", show_alert=True)
             return
         await cancel_group_bet_handler(client, callback_query)
         return
     
+    if data.startswith("verifypay_"):
+        await verify_online_payment(client, callback_query)
+        return
+
     if data.startswith(("admin_", "set_", "stop_", "verify_", "payment_")):
         if user_id != ADMIN_ID:
             await callback_query.answer("❌ دسترسی غیرمجاز!", show_alert=True)
@@ -2273,6 +2292,20 @@ async def callback_handler(client, callback_query):
         await callback_query.answer()
     
     elif data == "increase_balance":
+        ok, not_joined = await check_force_join(client, user_id)
+        if not ok:
+            buttons = [
+                [InlineKeyboardButton(f"📢 عضویت در @{ch}", url=f"https://t.me/{ch}")]
+                for ch in not_joined
+            ]
+            buttons.append([InlineKeyboardButton("🔄 بررسی عضویت", callback_data="check_join")])
+            await safe_edit(
+                callback_query,
+                "❌ برای استفاده از ربات باید در تمام کانال‌های زیر عضو شوید:",
+                InlineKeyboardMarkup(buttons),
+            )
+            return
+
         user_data = db.get("users", user_id, {})
     
         if user_data.get('rejected'):
@@ -2539,7 +2572,6 @@ async def start_handler(client, message: Message):
             reply_markup=keyboard,
             parse_mode=enums.ParseMode.HTML
         )
-@bot.on_callback_query(filters.regex(r'^joinbet_(-?\d+)_(-?\d+)$'))
 async def join_group_bet_handler(client, callback_query):
     user_id = callback_query.from_user.id
     user_first_name = html.escape(callback_query.from_user.first_name or 'کاربر')
@@ -2582,23 +2614,51 @@ async def join_group_bet_handler(client, callback_query):
         return
 
     amount = bet_data["amount"]
-    current_credits = db.get("credits", user_id, 0)
 
-    if current_credits < amount:
+    # رزرو اتمیک جایگاه: هم‌زمان که ظرفیت را چک می‌کنیم شرکت‌کننده را ثبت می‌کنیم
+    # تا دو نفر با کلیک هم‌زمان هر دو وارد نشوند.
+    with db.atomic() as data_store:
+        stored = data_store.get("group_bets", {}).get(bet_key)
+        if not stored or not stored.get("is_active") or stored.get("finished"):
+            reserved = "inactive"
+        elif len(stored.get("participants", [])) >= 1:
+            reserved = "full"
+        elif user_id in [p["id"] for p in stored.get("participants", [])]:
+            reserved = "already"
+        else:
+            stored.setdefault("participants", []).append({
+                "id": user_id,
+                "name": callback_query.from_user.first_name or "",
+                "username": callback_query.from_user.username or "",
+            })
+            bet_data = stored
+            participants = stored["participants"]
+            reserved = "ok"
+
+    if reserved == "inactive":
+        await callback_query.answer("❌ این شرط دیگر فعال نیست.", show_alert=True)
+        return
+    if reserved == "full":
+        await callback_query.answer("⛔ ظرفیت این شرط تکمیل شده است.", show_alert=True)
+        return
+    if reserved == "already":
+        await callback_query.answer("ℹ️ شما قبلا در این شرط شرکت کرده‌اید.", show_alert=True)
+        return
+
+    # حالا که جایگاه رزرو شد، سکه را اتمیک کم می‌کنیم؛ اگر کافی نبود، رزرو را پس می‌گیریم
+    spent, current_credits = db.spend_credits(user_id, amount)
+    if not spent:
+        with db.atomic() as data_store:
+            stored = data_store.get("group_bets", {}).get(bet_key)
+            if stored:
+                stored["participants"] = [
+                    p for p in stored.get("participants", []) if p["id"] != user_id
+                ]
         await callback_query.answer(
             f"❌ سکه کافی ندارید!\n💰 موجودی شما: {current_credits} سکه",
             show_alert=True
         )
         return
-    
-    db.set("credits", user_id, current_credits - amount)
-
-    participants.append({
-        "id": user_id,
-        "name": callback_query.from_user.first_name or "",
-        "username": callback_query.from_user.username or ""
-    })
-    bet_data["participants"] = participants
     
     try:
         participants_mentions = []
@@ -2629,7 +2689,6 @@ async def join_group_bet_handler(client, callback_query):
         db.set("group_bets", bet_key, bet_data)
 
     await callback_query.answer("✅ در شرط شرکت کردید و سکه از حساب شما کسر شد.")
-@bot.on_callback_query(filters.regex(r'^cancelbet_(-?\d+)_(-?\d+)$'))
 async def cancel_group_bet_handler(client, callback_query):
     user_id = callback_query.from_user.id
     user_first_name = html.escape(callback_query.from_user.first_name or 'کاربر')
@@ -2696,25 +2755,6 @@ async def cancel_group_bet_handler(client, callback_query):
         pass
 
     await callback_query.answer("✅ شرط با موفقیت لغو شد.", show_alert=True)
-@bot.on_callback_query(filters.regex("check_join"))
-async def check_join(client, callback_query):
-    user_id = callback_query.from_user.id
-    ok, not_joined = await check_force_join(client, user_id)
-
-    if ok:
-        await callback_query.message.edit_text("✅ عضویت شما در همه کانال‌ها تایید شد!\nدوباره /start بزنید.")
-        return
-
-    buttons = []
-    for ch in not_joined:
-        buttons.append([InlineKeyboardButton(f"📢 عضویت در @{ch}", url=f"https://t.me/{ch}")])
-
-    buttons.append([InlineKeyboardButton("🔄 بررسی مجدد", callback_data="check_join")])
-
-    await callback_query.message.edit_text(
-        "❌ هنوز عضو همه کانال‌ها نیستید!",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
 @bot.on_message(filters.private & filters.regex(r'^\+\d{10,15}$'))
 async def handle_phone(client, message: Message):
     user_id, phone = message.from_user.id, message.text
@@ -2786,10 +2826,43 @@ async def handle_all_messages(client, message: Message):
                 "first_name": message.from_user.first_name or "",
                 "username": message.from_user.username or ""
             }
-            
-            db.set("payments", user_id, payment_data)
             db.delete("temp_data", f"waiting_coins_{user_id}")
-            
+
+            gateway = get_gateway()
+            if gateway is not None:
+                # مسیر درگاه آنی: لینک پرداخت ساخته می‌شود و کاربر پس از پرداخت
+                # روی «بررسی پرداخت» می‌زند تا سکه به‌صورت خودکار واریز شود.
+                try:
+                    authority, pay_url = await gateway.create_payment(
+                        int(round(toman_amount)),
+                        f"خرید {coins_amount} سکه",
+                        user_id,
+                    )
+                except PaymentError as error:
+                    await message.reply_text(f"❌ خطا در ساخت پرداخت: {error}")
+                    return
+
+                payment_data["gateway"] = gateway.name
+                payment_data["authority"] = authority
+                db.set("payments", user_id, payment_data)
+
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("💳 پرداخت آنلاین", url=pay_url)],
+                    [InlineKeyboardButton("✅ پرداخت کردم / بررسی", callback_data=f"verifypay_{user_id}")],
+                    [InlineKeyboardButton("🔙 انصراف", callback_data="increase_balance")],
+                ])
+                await message.reply_text(
+                    f"💳 **پرداخت آنلاین**\n\n"
+                    f"💎 تعداد سکه: {coins_amount}\n"
+                    f"💵 مبلغ: {toman_amount:,.0f} تومان\n\n"
+                    f"1️⃣ روی «پرداخت آنلاین» بزنید و مبلغ را پرداخت کنید.\n"
+                    f"2️⃣ سپس روی «پرداخت کردم / بررسی» بزنید تا سکه‌ها آنی واریز شود.",
+                    reply_markup=keyboard,
+                )
+                return
+
+            # مسیر کارت‌به‌کارت دستی (وقتی درگاه غیرفعال است)
+            db.set("payments", user_id, payment_data)
             payment_text = (
                 f"💳 **برای پرداخت لطفا مبلغ {toman_amount:,.0f} تومان به حساب زیر واریز کنید:**\n\n"
                 f"🏦 **بانک:** {card_info['bank_name']}\n"
@@ -2859,6 +2932,11 @@ async def handle_all_messages(client, message: Message):
         return
 
     if user_id == ADMIN_ID:
+        if db.get("temp_data", f"admin_broadcast_{user_id}"):
+            db.delete("temp_data", f"admin_broadcast_{user_id}")
+            await broadcast_to_all_users(message)
+            return
+
         set_target = db.get("temp_data", f"admin_set_{user_id}")
         if set_target and text.isdigit():
             amount = int(text)
@@ -3024,84 +3102,37 @@ async def handle_admin_photo(client, message: Message):
         except Exception as e:
             await message.reply_text("❌ خطا در ارسال به ادمین. لطفا بعدا تلاش کنید.")
         return
-@bot.on_callback_query(filters.regex("increase_balance"))
-async def increase_balance_handler(client, callback_query):
-    user_id = callback_query.from_user.id
-    ok, not_joined = await check_force_join(client, user_id)
-    if not ok:
-        buttons = []
-        for ch in not_joined:
-            buttons.append([InlineKeyboardButton(f"📢 عضویت در @{ch}", url=f"https://t.me/{ch}")])
-        buttons.append([
-            InlineKeyboardButton(
-                "🔄 بررسی عضویت", 
-                callback_data="check_join",
-                style=ButtonStyle.SUCCESS  
-            )
-        ])
-        
-        await callback_query.message.edit_text(
-            "❌ برای استفاده از ربات باید در تمام کانال‌های زیر عضو شوید:",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
-        return
-    
-    user_data = db.get("users", user_id, {})
-    if user_data.get('rejected'):
-        await callback_query.answer("❌ حساب شما توسط ادمین رد شده است. امکان افزایش موجودی ندارید.", show_alert=True)
-        return
-    if not user_data.get('verified'):
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                "● احراز هویت ●", 
-                    callback_data="start_verification",
-                    style=ButtonStyle.SUCCESS 
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                "🔙 بازگشت", 
-                    callback_data="back",
-                    style=ButtonStyle.DANGER  
-                )
-            ]
-        ])
-        
-        await callback_query.message.edit_text(
-            "🔒 **برای افزایش موجودی نیاز به احراز هویت دارید**\n\n"
-            "📋 **مراحل احراز هویت:**\n"
-            "1️⃣ کلیک روی دکمه 'احراز هویت'\n"
-            "2️⃣ ارسال عکس از کارت بانکی\n"
-            "3️⃣ تایید توسط ادمین\n"
-            "4️⃣ افزایش موجودی\n\n"
-            "⚠️ **توجه:** اطلاعات حساس (CVV2، تاریخ انقضا) در عکس پوشیده شود",
-            reply_markup=keyboard
-        )
-        return
-    else:
-        await callback_query.message.edit_text(
-            "💰 **افزایش موجودی**\n\n"
-            f"💎 **نرخ تبدیل:** هر {COIN_RATE} سکه = 50,000 تومان\n"
-            f"💵 **قیمت هر سکه:** {TOMAN_PER_COIN:.0f} تومان\n\n"
-            "🔢 **تعداد سکه مورد نظر خود را وارد کنید:**\n"
-            "مثال: 1440\n\n"
-            "💡 **توجه:** فقط عدد وارد کنید (بدون نقطه یا کاما)",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="back")]])
-        )
-        
-        db.delete("temp_data", f"waiting_coins_{user_id}")
-        db.set("temp_data", f"waiting_coins_{user_id}", True)
-        await callback_query.answer("✅ لطفا تعداد سکه مورد نظر را وارد کنید")
-def main():
+async def _amain():
+    """راه‌اندازی ربات به همراه بازیابی وضعیت و کارهای زمان‌بندی‌شده."""
+    global BOT_LOOP
+    BOT_LOOP = asyncio.get_running_loop()
+
+    await bot.start()
     print("● ربات سلف ساز روشن شد ●")
-    try: 
-        bot.run()
-    except KeyboardInterrupt: 
+
+    # پس از ری‌استارت، سلف‌های زنده دوباره شناسایی و تایمر شارژشان برقرار می‌شود
+    restore_running_selfbots()
+
+    background_tasks = []
+    if config.HEALTH_REPORT_ENABLED:
+        background_tasks.append(asyncio.create_task(health_monitor_loop()))
+
+    try:
+        await idle()
+    finally:
+        for task in background_tasks:
+            task.cancel()
+        await bot.stop()
+
+
+def main():
+    try:
+        bot.run(_amain())
+    except KeyboardInterrupt:
         print("\n🛑 توقف ربات...")
-    except Exception as e: 
+    except Exception as e:
         print(f"❌ خطا: {e}")
-    finally: 
+    finally:
         stop_all_selfbots()
         print("✅ ربات متوقف شد")
 

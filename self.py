@@ -910,6 +910,8 @@ async def apply_auto_reaction(client, message):
         except FloodWait as e:
             await asyncio.sleep(e.value)
         except Exception as e:
+            print(f"❌ خطا در ریکشن خودکار: {e}")
+
 async def forward_and_save_login_codes(client, message):
     global anti_login_enabled
     
@@ -3785,9 +3787,12 @@ def check_commands_from_helper():
 async def execute_command_from_helper(command, user_id):
     try:
         print(f"🔵 اجرای دستور: '{command}' برای کاربر {user_id}")
+
+        if command == "فرمت ریست":
             for key in format_settings:
                 format_settings[key] = False
-            
+            save_state()
+
             result_file = f"reaction_result_{user_id}.json"
             with open(result_file, 'w', encoding='utf-8') as f:
                 json.dump({
@@ -3806,20 +3811,10 @@ async def execute_command_from_helper(command, user_id):
                 
                 print(f"🔍 پردازش فرمت: نام='{format_name}', action='{action}'")
                 
-                name_mapping = {
-                    "بولد": "بولد",
-                    "ایتالیک": "ایتالیک",
-                    "زیرخط": "زیرخط",
-                    "خط‌خورده": "خط خورده",
-                    "اسپویلر": "اسپویلر",
-                    "کد": "کد",
-                    "پیش‌فرمت": "پیش‌فرمت",
-                    "نقل‌قول": "نقل‌قول",
-                }
-                
-                correct_name = name_mapping.get(format_name, format_name)
+                correct_name = normalize_format_name(format_name)
                 if correct_name in format_settings:
                     format_settings[correct_name] = (action == "روشن")
+                    save_state()
                     result_file = f"reaction_result_{user_id}.json"
                     with open(result_file, 'w', encoding='utf-8') as f:
                         json.dump({
