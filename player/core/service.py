@@ -16,6 +16,7 @@ from ..utils.keyboards import player_panel
 from ..utils.logger import get_logger
 from ..utils.thumbnail import now_playing_image
 from .calls import calls_service
+from .callwatch import callwatch
 from .clients import active_assistants, bot
 from .db import db
 from .errors import NoResult, QueueFull, UserError
@@ -104,8 +105,10 @@ class PlayerService:
             await self._safe_send(chat_id, s("err_video_limit", limit=config.VIDEO_CALL_LIMIT))
 
         prepared = await resolver.prepare_track(track)
+        prepared.media_volume = int(db.chat_setting(chat_id, "media_volume", 100) or 100)
         await calls_service.play(chat_id, prepared)
 
+        callwatch.mark_open(chat_id)
         queues.set_current(chat_id, prepared)
         queues.set_paused(chat_id, False)
         queues.set_muted(chat_id, False)
@@ -181,6 +184,42 @@ class PlayerService:
         queues.set_current(chat_id, updated)
         queues.set_paused(chat_id, False)
 
+    async def set_media_volume(self, chat_id: int, volume: int) -> None:
+        """صدای خود رسانه (قبل از ارسال به ویس‌چت) را تغییر می‌دهد.
+
+        برخلاف صدای ویس‌چت، این مقدار در ضبط ویس‌چت هم شنیده می‌شود؛ چون روی جریان
+        اعمال می‌شود، پخش باید از همان لحظه دوباره شروع شود.
+        """
+        db.set_chat_setting(chat_id, "media_volume", volume)
+        track = queues.current(chat_id)
+        if track is None:
+            return
+        played = await calls_service.played_time(chat_id)
+        updated = track.clone()
+        updated.media_volume = volume
+        if not updated.is_live:
+            updated.seek = max(0, played)
+        await calls_service.play(chat_id, updated)
+        queues.set_current(chat_id, updated)
+        queues.set_paused(chat_id, False)
+
+    async def set_subtitle(self, chat_id: int, subtitle_path: str | None) -> Track:
+        """چسباندن (یا برداشتن) زیرنویس روی پخش ویدیویی فعلی."""
+        track = queues.current(chat_id)
+        if track is None:
+            raise UserError("err_no_active")
+        if not track.video:
+            raise UserError("err_subtitle_audio")
+        played = await calls_service.played_time(chat_id)
+        updated = track.clone()
+        updated.subtitle_path = subtitle_path
+        if not updated.is_live:
+            updated.seek = max(0, played)
+        await calls_service.play(chat_id, updated)
+        queues.set_current(chat_id, updated)
+        queues.set_paused(chat_id, False)
+        return updated
+
     async def replay(self, chat_id: int) -> None:
         track = queues.current(chat_id)
         if track is None:
@@ -204,10 +243,20 @@ class PlayerService:
                 pass
         if reason_key:
             s = strings_for(chat_id)
-            await self._safe_send(chat_id, s(reason_key, **params))
+            message = await self._safe_send(chat_id, s(reason_key, **params))
+            if message is not None and db.chat_setting(chat_id, "auto_clear", False):
+                asyncio.create_task(self._delete_later(chat_id, message.id))
 
     async def stop(self, chat_id: int, requester: str = "") -> None:
         await self.cleanup(chat_id, reason_key="ended", requester=requester or "-")
+
+    async def _delete_later(self, chat_id: int, message_id: int) -> None:
+        """پاک‌سازی خودکار پیام پایان پخش (قابلیت «پاکسازی خودکار»)."""
+        await asyncio.sleep(max(1, config.AUTO_CLEAR_SECONDS))
+        try:
+            await bot.delete_messages(chat_id, message_id)
+        except Exception as error:  # noqa: BLE001
+            LOGGER.debug("پاک‌سازی خودکار پیام در %s ناموفق بود: %s", chat_id, error)
 
     # ── پنل «در حال پخش» ─────────────────────────────────────────────────────
     async def send_panel(self, chat_id: int, track: Track) -> None:
@@ -223,7 +272,10 @@ class PlayerService:
 
         previous = queues.panel(chat_id)
         image = None
-        if track.thumbnail:
+        classic = bool(db.chat_setting(chat_id, "classic_mode", False))
+        if classic:
+            image = None  # حالت کلاسیک: پاسخ سادهٔ متنی بدون تصویر
+        elif track.thumbnail:
             image = await now_playing_image(
                 track.thumbnail,
                 track.title,
@@ -395,6 +447,7 @@ async def resolve_and_play(
     requester_id: int,
     requester_name: str,
     force: bool = False,
+    download: bool = False,
 ) -> tuple[str, int, Track]:
     """میان‌بر: تبدیل عبارت به آیتم و پخش/صف کردن آن."""
     limit = db.chat_setting(chat_id, "duration_limit", config.DURATION_LIMIT_MINUTES)
@@ -404,6 +457,7 @@ async def resolve_and_play(
         requester_id=requester_id,
         requester_name=requester_name,
         limit_minutes=limit,
+        download=download,
     )
     first = resolved.first
     if first is None:

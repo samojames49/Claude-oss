@@ -103,6 +103,29 @@ INACTIVE_TIMEOUT_SECONDS = _int("INACTIVE_TIMEOUT_SECONDS", 600) or 600
 EMPTY_CALL_TIMEOUT_SECONDS = _int("EMPTY_CALL_TIMEOUT_SECONDS", 120) or 120
 WATCHER_INTERVAL_SECONDS = _int("WATCHER_INTERVAL_SECONDS", 30) or 30
 
+# ── آمار ویس‌چت (آمار کال) ────────────────────────────────────────────────────
+CALL_STATS_ENABLED = _bool("CALL_STATS_ENABLED", True)
+CALL_STATS_INTERVAL_SECONDS = _int("CALL_STATS_INTERVAL_SECONDS", 60) or 60
+CALL_STATS_KEEP_DAYS = _int("CALL_STATS_KEEP_DAYS", 40) or 40
+CALL_STATS_TOP = _int("CALL_STATS_TOP", 20) or 20
+
+# ── امنیت کال ─────────────────────────────────────────────────────────────────
+CALL_SECURITY_ENABLED = _bool("CALL_SECURITY_ENABLED", False)
+CALL_SECURITY_MIN_AGE_DAYS = _int("CALL_SECURITY_MIN_AGE_DAYS", 7) or 7
+CALL_SECURITY_MAX_JOINS = _int("CALL_SECURITY_MAX_JOINS", 5) or 5
+
+# ── پخش زنده تلویزیون/ماهواره ────────────────────────────────────────────────
+LIVE_CHANNELS_FILE = _str("LIVE_CHANNELS_FILE", "")  # پیش‌فرض: player/data/live_channels.json
+
+# ── زیرنویس ───────────────────────────────────────────────────────────────────
+SUBTITLE_ENABLED = _bool("SUBTITLE_ENABLED", True)
+SUBTITLE_FONT_SIZE = _int("SUBTITLE_FONT_SIZE", 20) or 20
+SUBTITLE_MAX_MB = _int("SUBTITLE_MAX_MB", 5) or 5
+
+# ── پیام‌ها ───────────────────────────────────────────────────────────────────
+AUTO_CLEAR_SECONDS = _int("AUTO_CLEAR_SECONDS", 10) or 10  # پاک‌سازی خودکار پیام پایان پخش
+INVITE_CALL_LIMIT = _int("INVITE_CALL_LIMIT", 200) or 200
+
 # ── دسترسی ────────────────────────────────────────────────────────────────────
 PRIVATE_MODE = _bool("PRIVATE_MODE", False)  # فقط گروه‌های تاییدشده
 FORCE_SUB_CHANNEL = _str("FORCE_SUB_CHANNEL", "")  # یوزرنیم بدون @
@@ -117,6 +140,14 @@ DOWNLOADS_DIR = Path(_str("DOWNLOADS_DIR", str(BASE_DIR / "downloads")))
 CACHE_DIR = Path(_str("CACHE_DIR", str(BASE_DIR / "cache")))
 DB_FILE = Path(_str("DB_FILE", str(BASE_DIR / "player_db.json")))
 SESSION_DIR = Path(_str("SESSION_DIR", str(BASE_DIR / "sessions")))
+DATA_DIR = BASE_DIR / "data"
+
+
+def live_channels_file() -> Path:
+    """مسیر فایل شبکه‌های پخش زنده (قابل جایگزینی با LIVE_CHANNELS_FILE)."""
+    if LIVE_CHANNELS_FILE:
+        return Path(LIVE_CHANNELS_FILE)
+    return DATA_DIR / "live_channels.json"
 
 AUDIO_QUALITY_MAP = {"studio": "STUDIO", "high": "HIGH", "medium": "MEDIUM", "low": "LOW"}
 VIDEO_QUALITY_MAP = {

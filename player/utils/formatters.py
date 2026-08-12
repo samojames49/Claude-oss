@@ -22,6 +22,17 @@ def seconds_to_time(seconds: int | float | None) -> str:
     return f"{minutes}:{secs:02d}"
 
 
+def seconds_to_clock(seconds: int | float | None) -> str:
+    """۳۶۶۰ ثانیه → «01:01:00» (همیشه با ساعت، برای جدول آمار کال)."""
+    try:
+        total = max(0, int(seconds or 0))
+    except (TypeError, ValueError):
+        total = 0
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def time_to_seconds(value: str | int | float | None) -> int:
     """«۲:۰۵» یا «1:02:03» یا «90» → تعداد ثانیه."""
     if value is None:

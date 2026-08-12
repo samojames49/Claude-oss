@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from pyrogram import raw
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.errors import (
     ChannelInvalid,
@@ -41,14 +42,38 @@ def video_quality() -> VideoQuality:
     return getattr(VideoQuality, config.VIDEO_QUALITY_MAP[config.VIDEO_QUALITY])
 
 
+def _subtitle_filter(path: str) -> str:
+    """فیلتر ffmpeg زیرنویس با کاراکترهای فرار‌شده (مسیر ممکن است کاراکتر ویژه داشته باشد)."""
+    escaped = path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    return f"subtitles='{escaped}'"
+
+
 def build_stream(track: Track) -> MediaStream:
     """ساخت MediaStream مناسب برای یک آیتم پخش."""
     ffmpeg_parameters: list[str] = []
     if track.seek > 0:
         ffmpeg_parameters += ["-ss", str(int(track.seek))]
+
+    # فیلترهای صوتی باید در یک ‎-af جمع شوند؛ ffmpeg فقط آخرین ‎-af را می‌بیند.
+    audio_filters: list[str] = []
     if track.speed and abs(track.speed - 1.0) > 0.01:
-        # فیلتر atempo باید بعد از ورودی بیاید (نشانهٔ -atmid در pytgcalls)
-        ffmpeg_parameters += ["--audio", "-atmid", "-af", f"atempo={track.speed:g}"]
+        audio_filters.append(f"atempo={track.speed:g}")
+    if track.media_volume and track.media_volume != 100:
+        audio_filters.append(f"volume={max(1, track.media_volume) / 100:g}")
+    if audio_filters:
+        # نشانهٔ -atmid یعنی این پارامترها بعد از ورودی (‎-i) بیایند
+        ffmpeg_parameters += ["--audio", "-atmid", "-af", ",".join(audio_filters)]
+
+    if track.video and track.subtitle_path:
+        # pytgcalls خودش ‎-vf scale=… را بعد از mid اضافه می‌کند و ffmpeg تنها آخرین ‎-vf را
+        # اعمال می‌کند؛ پس زیرنویس و مقیاس را با هم در انتهای دستور می‌گذاریم.
+        width, height, _ = video_quality().value
+        ffmpeg_parameters += [
+            "--video",
+            "-vtend",
+            "-vf",
+            f"{_subtitle_filter(track.subtitle_path)},scale={width}:{height}",
+        ]
 
     source = track.file_path or track.source
     audio_source = None if track.file_path else track.audio_source
@@ -215,6 +240,118 @@ class CallsService:
         if people is None:
             return -1
         return len([person for person in people if getattr(person, "user_id", 0) != assistant.id])
+
+    # ── ویس‌چت از دید MTProto (بدون نیاز به حضور اسیستنت در کال) ──────────────
+    async def input_call(self, chat_id: int) -> Any | None:
+        """`InputGroupCall` ویس‌چت فعال گروه؛ None یعنی ویس‌چتی روشن نیست."""
+        assistant = self.assistant(chat_id)
+        try:
+            peer = await assistant.client.resolve_peer(chat_id)
+            if isinstance(peer, raw.types.InputPeerChannel):
+                full = await assistant.client.invoke(
+                    raw.functions.channels.GetFullChannel(
+                        channel=raw.types.InputChannel(
+                            channel_id=peer.channel_id, access_hash=peer.access_hash
+                        )
+                    )
+                )
+            else:
+                full = await assistant.client.invoke(
+                    raw.functions.messages.GetFullChat(chat_id=abs(chat_id))
+                )
+            return getattr(full.full_chat, "call", None)
+        except Exception as error:  # noqa: BLE001
+            LOGGER.debug("خواندن ویس‌چت %s ناموفق بود: %s", chat_id, error)
+            return None
+
+    async def raw_participants(self, chat_id: int, limit: int = 200) -> list[Any] | None:
+        """شرکت‌کنندگان ویس‌چت با جزئیات کامل (میوت، ویدیو، تاریخ ورود، منبع).
+
+        برخلاف `participants`، اسیستنت لازم نیست داخل کال باشد؛ فقط باید عضو گروه باشد.
+        None یعنی ویس‌چت روشن نیست یا خواندن ممکن نشد.
+        """
+        call = await self.input_call(chat_id)
+        if call is None:
+            return None
+        assistant = self.assistant(chat_id)
+        try:
+            result = await assistant.client.invoke(
+                raw.functions.phone.GetGroupParticipants(
+                    call=call, ids=[], sources=[], offset="", limit=limit
+                )
+            )
+            return list(result.participants or [])
+        except Exception as error:  # noqa: BLE001
+            LOGGER.debug("خواندن شرکت‌کنندگان خام %s ناموفق بود: %s", chat_id, error)
+            return None
+
+    async def set_call_title(self, chat_id: int, title: str) -> None:
+        """تنظیم عنوان ویس‌چت گروه."""
+        call = await self.input_call(chat_id)
+        if call is None:
+            raise NoVoiceChat()
+        assistant = self.assistant(chat_id)
+        try:
+            await assistant.client.invoke(
+                raw.functions.phone.EditGroupCallTitle(call=call, title=title[:64])
+            )
+        except Exception as error:  # noqa: BLE001
+            raise UserError("err_generic", error=str(error)[:200]) from error
+
+    async def invite_to_call(self, chat_id: int, user_ids: list[int]) -> int:
+        """دعوت کاربران به ویس‌چت؛ تعداد دعوت‌های موفق را برمی‌گرداند."""
+        call = await self.input_call(chat_id)
+        if call is None:
+            raise NoVoiceChat()
+        assistant = self.assistant(chat_id)
+        invited = 0
+        for chunk_start in range(0, len(user_ids), 10):
+            chunk = user_ids[chunk_start : chunk_start + 10]
+            users = []
+            for user_id in chunk:
+                try:
+                    users.append(await assistant.client.resolve_peer(user_id))
+                except Exception:  # noqa: BLE001
+                    continue
+            users = [user for user in users if isinstance(user, raw.types.InputPeerUser)]
+            if not users:
+                continue
+            try:
+                await assistant.client.invoke(
+                    raw.functions.phone.InviteToGroupCall(
+                        call=call,
+                        users=[
+                            raw.types.InputUser(user_id=user.user_id, access_hash=user.access_hash)
+                            for user in users
+                        ],
+                    )
+                )
+                invited += len(users)
+            except FloodWait as error:
+                LOGGER.info("دعوت به کال %s با فلود مواجه شد: %s", chat_id, error.value)
+                break
+            except Exception as error:  # noqa: BLE001
+                LOGGER.debug("دعوت به کال %s ناموفق بود: %s", chat_id, error)
+            await asyncio.sleep(1)
+        return invited
+
+    async def set_participant_muted(self, chat_id: int, user_id: int, muted: bool) -> bool:
+        """میوت/آنمیوت یک عضو ویس‌چت (اسیستنت باید دسترسی مدیریت ویس‌چت داشته باشد)."""
+        call = await self.input_call(chat_id)
+        if call is None:
+            return False
+        assistant = self.assistant(chat_id)
+        try:
+            peer = await assistant.client.resolve_peer(user_id)
+            await assistant.client.invoke(
+                raw.functions.phone.EditGroupCallParticipant(
+                    call=call, participant=peer, muted=muted
+                )
+            )
+            return True
+        except Exception as error:  # noqa: BLE001
+            LOGGER.debug("تغییر وضعیت مایک %s در %s ناموفق بود: %s", user_id, chat_id, error)
+            return False
 
     def ping(self) -> float:
         """میانگین پینگ هستهٔ صوتی روی اسیستنت‌های فعال."""

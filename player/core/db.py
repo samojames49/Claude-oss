@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import tempfile
+from datetime import date, datetime
 from pathlib import Path
 from time import time
 from typing import Any
@@ -36,7 +37,27 @@ _CHAT_DEFAULT: dict[str, Any] = {
     "plays": 0,
     "approved": False,
     "added_at": 0,
+    # آمار ویس‌چت
+    "call_stats": None,  # None => از تنظیمات سراسری
+    "call_stats_auto": False,  # ارسال خودکار آمار هنگام بسته‌شدن کال
+    "call_stats_reset": "",  # "" | daily | monthly
+    # ظاهر و پیام‌ها
+    "classic_mode": False,  # پاسخ‌های ساده بدون تصویر
+    "auto_clear": False,  # پاک‌سازی خودکار پیام پایان پخش
+    "media_volume": 100,  # صدای رسانه (قبل از ارسال به ویس‌چت)
+    # پخش در کانال متصل
+    "player_channel": 0,
+    "play_in_channel": False,
+    # امنیت کال
+    "call_security": None,  # None => از تنظیمات سراسری
+    "security_owners_access": True,
+    "security_summary": True,
+    "security_report": True,
+    "security_min_age_days": None,
+    "security_mute_on_join": False,
 }
+
+_CALL_STATS_DEFAULT: dict[str, Any] = {"days": {}, "names": {}, "last_reset": 0}
 
 
 class Database:
@@ -262,6 +283,96 @@ class Database:
         if users.pop(str(user_id), None) is None:
             return False
         self.mark_dirty()
+        return True
+
+    # ── آمار ویس‌چت (آمار کال) ────────────────────────────────────────────────
+    def call_log(self, chat_id: int) -> dict[str, Any]:
+        """جدول زمان حضور اعضا در ویس‌چت، به تفکیک روز."""
+        entry = self.chat(chat_id).setdefault("call_log", json.loads(json.dumps(_CALL_STATS_DEFAULT)))
+        entry.setdefault("days", {})
+        entry.setdefault("names", {})
+        entry.setdefault("last_reset", 0)
+        return entry
+
+    def add_call_time(
+        self, chat_id: int, user_id: int, seconds: int, name: str = "", day: str | None = None
+    ) -> None:
+        if seconds <= 0:
+            return
+        log = self.call_log(chat_id)
+        key = day or date.today().isoformat()
+        bucket = log["days"].setdefault(key, {})
+        bucket[str(user_id)] = int(bucket.get(str(user_id), 0)) + int(seconds)
+        if name:
+            log["names"][str(user_id)] = name[:64]
+        self.mark_dirty()
+
+    def call_totals(self, chat_id: int, days: list[str]) -> list[tuple[int, int]]:
+        """جمع زمان حضور هر کاربر در روزهای داده‌شده؛ مرتب‌شده نزولی."""
+        log = self.call_log(chat_id)
+        totals: dict[int, int] = {}
+        for day in days:
+            for raw_id, seconds in log["days"].get(day, {}).items():
+                try:
+                    user_id = int(raw_id)
+                except ValueError:
+                    continue
+                totals[user_id] = totals.get(user_id, 0) + int(seconds)
+        return sorted(totals.items(), key=lambda item: item[1], reverse=True)
+
+    def call_user_name(self, chat_id: int, user_id: int) -> str:
+        return self.call_log(chat_id)["names"].get(str(user_id), "")
+
+    def set_call_user_name(self, chat_id: int, user_id: int, name: str) -> None:
+        if not name:
+            return
+        self.call_log(chat_id)["names"][str(user_id)] = name[:64]
+        self.mark_dirty()
+
+    def call_recorded_days(self, chat_id: int) -> list[str]:
+        return sorted(self.call_log(chat_id)["days"].keys())
+
+    def reset_call_stats(self, chat_id: int) -> int:
+        """پاک‌کردن کل آمار کال گروه؛ تعداد روزهای پاک‌شده را برمی‌گرداند."""
+        log = self.call_log(chat_id)
+        removed = len(log["days"])
+        log["days"] = {}
+        log["names"] = {}
+        log["last_reset"] = int(time())
+        self.mark_dirty()
+        return removed
+
+    def prune_call_stats(self, chat_id: int, keep_days: int) -> None:
+        """حذف روزهای قدیمی‌تر از سقف نگه‌داری تا دیتابیس بی‌نهایت رشد نکند."""
+        log = self.call_log(chat_id)
+        days = sorted(log["days"].keys())
+        if len(days) <= keep_days:
+            return
+        for day in days[: len(days) - keep_days]:
+            log["days"].pop(day, None)
+        alive = {uid for bucket in log["days"].values() for uid in bucket}
+        log["names"] = {uid: name for uid, name in log["names"].items() if uid in alive}
+        self.mark_dirty()
+
+    def apply_call_stats_reset(self, chat_id: int) -> bool:
+        """ریست خودکار روزانه/ماهیانه؛ True یعنی همین حالا ریست شد."""
+        period = self.chat_setting(chat_id, "call_stats_reset", "") or ""
+        if period not in ("daily", "monthly"):
+            return False
+        log = self.call_log(chat_id)
+        last = int(log.get("last_reset", 0) or 0)
+        if not last:
+            log["last_reset"] = int(time())
+            self.mark_dirty()
+            return False
+        previous = datetime.fromtimestamp(last)
+        now = datetime.now()
+        due = previous.date() != now.date() if period == "daily" else (
+            (previous.year, previous.month) != (now.year, now.month)
+        )
+        if not due:
+            return False
+        self.reset_call_stats(chat_id)
         return True
 
     # ── تنظیمات سراسری و آمار ────────────────────────────────────────────────

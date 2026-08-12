@@ -89,6 +89,12 @@ STRINGS = {
     "err_duration_limit": "⚠️ Duration is {duration}, above the {limit} minute limit.",
     "err_no_result": "🔍 Nothing found. Try another query.",
     "err_need_query": "What should I play?\nExample: `/play imagine dragons`\nOr reply to an audio/video file.",
+    "download_usage": (
+        "Send the content link after the command:\n"
+        "`/dl https://www.instagram.com/reel/…`\n\n"
+        "YouTube, Instagram, TikTok and anything yt-dlp supports.\n"
+        "The content must be public and not a live stream."
+    ),
     "err_file_too_big": "⚠️ File is too large (limit {limit} MB).",
     "err_blocked_user": "🚫 You are blocked from using this bot.",
     "err_blocked_chat": "🚫 This chat is banned from using the bot.",
@@ -138,6 +144,13 @@ STRINGS = {
     "volume_set": "🔊 Volume set to **{volume}%**.",
     "volume_range": "Volume must be between 1 and 200.",
     "seeked": "⏩ Jumped to **{position}**.",
+    "timeplay_usage": (
+        "Send the target time:\n"
+        "• seconds: `Time play 45`\n"
+        "• minutes: `Time play 03:20`\n"
+        "• hours: `Time play 01:02:03`"
+    ),
+    "media_volume_set": "🎚 Media volume set to **{volume}%**.",
     "loop_on": "🔁 Loop enabled for the next **{count}** rounds.",
     "loop_off": "➡️ Loop disabled.",
     "shuffled": "🔀 Queue shuffled ({count} items).",
@@ -245,6 +258,91 @@ STRINGS = {
     "maintenance_off": "✅ Maintenance mode disabled.",
     "cleanup_done": "🧹 Cleanup done: {count} files ({size}) removed.",
     "logs_missing": "Log file not found.",
+    # ── voice chat management ────────────────────────────────────────────────
+    "call_title_usage": "Write the title after the command:\n`/setcalltitle Movie night`",
+    "call_title_set": "✏️ Voice chat title set to **{title}**.",
+    "invite_started": "📨 Inviting {count} members to the voice chat…",
+    "invite_done": "📨 Invited **{invited}** of {total} members.",
+    "invite_no_target": "No one to invite.",
+    "autoclear_on": "🧹 Auto-clearing of the stream-ended message enabled.",
+    "autoclear_off": "🧹 Auto-clearing disabled.",
+    "classic_on": "🪴 Classic mode on: plain replies without artwork.",
+    "classic_off": "🪴 Classic mode off: the artwork panel is back.",
+    "play_channel_on": "☕️ Playback now happens in the linked channel's voice chat.",
+    "play_channel_off": "☕️ Playback moved back to this group's voice chat.",
+    "play_channel_missing": "Link a channel first with `/setplayerchannel`.",
+    "play_channel_usage": (
+        "Send the channel id or username:\n"
+        "`/setplayerchannel -1001234567890`\n"
+        "Or reply to a message forwarded from that channel.\n"
+        "To unlink: `/setplayerchannel remove`"
+    ),
+    "play_channel_set": "🔗 Channel **{title}** (`{chat_id}`) linked to this group's player.",
+    "play_channel_removed": "🔗 Channel link removed.",
+    "play_channel_unreachable": "❌ Channel unreachable:\n`{error}`",
+    # ── live TV / satellite ──────────────────────────────────────────────────
+    "live_header": (
+        "📡 **Live TV**\n\n"
+        "{count} channels in {categories} categories.\n"
+        "Pick a category or type: `/live channel name`"
+    ),
+    "live_category_header": "📡 **{title}**\n\n{count} channels — pick one:",
+    "live_starting": "📡 Connecting to {name}…",
+    "live_not_found": "📡 No channel matching “{query}”.",
+    "live_empty": (
+        "📡 The channel list is empty.\n"
+        "Fill `player/data/live_channels.json` or point `LIVE_CHANNELS_FILE` elsewhere."
+    ),
+    "live_reloaded": "♻️ Channel list reloaded: {count} channels in {categories} categories.",
+    # ── voice chat stats ─────────────────────────────────────────────────────
+    "callstats_header": "🎙 **Call stats — {title}**\n\n",
+    "callstats_item": "**{index}.** {user} — `{duration}`\n",
+    "callstats_empty": "🎙 No stats recorded for this period.",
+    "callstats_title_today": "today",
+    "callstats_title_days": "last {count} days",
+    "callstats_title_day": "{day}",
+    "callstats_on": "✅ Call stats recording enabled for this chat.",
+    "callstats_off": "🚫 Call stats recording disabled for this chat.",
+    "callstats_disabled_hint": "\n\n⚠️ Recording is off; turn it on with `Stats call active`.",
+    "callstats_auto_on": "✅ Stats will be posted automatically when the voice chat ends.",
+    "callstats_auto_off": "🚫 Automatic stats posting disabled.",
+    "callstats_need_switch": "Write `active` or `inactive`.",
+    "callstats_bad_argument": (
+        "Use one of these forms:\n"
+        "• `Stats call` — today\n"
+        "• `Stats call 7` — last 1..7 days\n"
+        "• `Stats call Friday` — a weekday\n"
+        "• `Stats call active` / `Stats call inactive`"
+    ),
+    "callstats_reset_done": "🗑 Call stats cleared ({days} days).",
+    "callstats_reset_daily": "🔄 Call stats will reset daily.",
+    "callstats_reset_monthly": "🔄 Call stats will reset monthly.",
+    "callstats_reset_off": "🔄 Automatic stats reset disabled.",
+    "id_card": (
+        "🆔 **User card**\n\n"
+        "▫️ **User:** {user}\n"
+        "▫️ **ID:** `{user_id}`\n"
+        "▫️ **Chat:** `{chat_id}`\n"
+        "▫️ **Voice chat rank (7d):** {rank} of {total}\n"
+        "▫️ **Time in call:** `{duration}`"
+    ),
+    # ── call security ────────────────────────────────────────────────────────
+    "security_report_header": "🛡 **Call security report**\n\n",
+    "security_event_line": "• {user} — {event}\n",
+    "security_event_rejoin": "repeated joins",
+    "security_event_unmuted_join": "unmuted microphone on join",
+    "security_event_video_rejoin": "repeated video joins",
+    "security_event_multi_source": "multiple stream sources",
+    "security_event_multi_endpoint": "multiple endpoints",
+    "security_event_time_gap": "abnormal time gap",
+    "security_summary_title": "Voice chat security summary",
+    "security_summary_meta": "Chat: {chat_id} | call duration: {duration}",
+    "security_summary_totals": "Totals:",
+    "security_summary_caption": "🛡 Suspicious behaviour summary for this voice chat.",
+    "security_on": "🛡 Call security enabled.",
+    "security_off": "🛡 Call security disabled.",
+    "security_age_set": "🥶 Required membership age set to **{days} days**.",
+    "security_age_prompt": "Send the number of days (example: `Account age 7`).",
     # ── logging ──────────────────────────────────────────────────────────────
     "log_new_chat": "🆕 **New chat**\nTitle: {title}\nID: `{chat_id}`\nAdded by: {user}",
     "log_left_chat": "👋 **Left chat**\nTitle: {title}\nID: `{chat_id}`",

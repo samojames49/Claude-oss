@@ -28,6 +28,8 @@ class Track:
     message_id: int | None = None  # پیام تلگرامی مبدأ
     speed: float = 1.0
     seek: int = 0
+    media_volume: int = 100  # صدای رسانه قبل از ارسال به ویس‌چت (۱ تا ۲۰۰)
+    subtitle_path: str | None = None  # زیرنویس چسبیده روی تصویر (SoftSub)
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -74,5 +76,7 @@ class Track:
             message_id=self.message_id,
             speed=self.speed,
             seek=self.seek,
+            media_volume=self.media_volume,
+            subtitle_path=self.subtitle_path,
             extra=dict(self.extra),
         )

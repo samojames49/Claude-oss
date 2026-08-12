@@ -12,6 +12,7 @@ async def _run() -> None:
     config.validate()
 
     # ایمپورت بعد از اعتبارسنجی تنظیمات انجام می‌شود تا کلاینت‌ها با مقادیر درست ساخته شوند
+    from .core.callwatch import callwatch
     from .core.clients import start_clients, stop_clients
     from .core.db import db
     from .core.service import player
@@ -21,6 +22,7 @@ async def _run() -> None:
 
     player.setup_handlers()
     player.start_watcher()
+    callwatch.start()
     autosave = asyncio.create_task(db.autosave_loop())
 
     from .core.clients import bot
