@@ -726,6 +726,87 @@ HELP_TEXTS = {
 
 <b>کاربرد:</b>
 مدیریت کامل گروه‌ها و سوپرگروه‌ها
+""",
+    "fun": """
+🎉 <b>سرگرمی</b>
+
+<b>دستورات قابل کپی:</b>
+<code>فال</code>
+<code>سکه</code>
+<code>گوی سوال شما</code>
+<code>جوک</code>
+<code>نقل</code>
+<code>شمارش 10</code>
+
+<b>کاربرد:</b>
+فال حافظ، شیر یا خط، گوی جادویی (پاسخ بله/خیر)،
+جوک و نقل‌قول تصادفی، و شمارش معکوس زنده.
+""",
+    "texttools": """
+🔤 <b>ابزار متن</b>
+
+<b>دستورات قابل کپی:</b>
+<code>برعکس متن شما</code>
+<code>فاصله متن شما</code>
+<code>تکرار 3 متن شما</code>
+<code>تلگرافی متن شما</code>
+<code>حساب 2+3*4</code>
+
+<b>کاربرد:</b>
+معکوس‌کردن متن، فاصله‌گذاری حروف، تکرار متن،
+افکت تایپ زنده (تلگرافی) و ماشین‌حساب امن.
+""",
+    "profiletools": """
+👤 <b>مدیریت پروفایل</b>
+
+<b>دستورات قابل کپی:</b>
+<code>اسم نام جدید</code>
+<code>فامیل نام خانوادگی</code>
+<code>فامیل</code> (برای حذف نام خانوادگی)
+<code>بیو متن بایو</code>
+
+<b>کاربرد:</b>
+تغییر سریع نام، نام خانوادگی و بایوی اکانت.
+""",
+    "timetools": """
+🕐 <b>زمان و وضعیت</b>
+
+<b>دستورات قابل کپی:</b>
+<code>ساعت</code>
+<code>تاریخ</code>
+<code>وضعیت سلف</code>
+<code>پینگ</code>
+
+<b>کاربرد:</b>
+نمایش ساعت و تاریخ (میلادی/شمسی)، آپ‌تایم و پینگ سلف.
+""",
+    "translate": """
+🌐 <b>مترجم</b>
+
+<b>دستورات قابل کپی:</b>
+<code>مترجم متن مورد نظر</code>
+<code>مترجم en متن فارسی</code>
+
+<b>کاربرد:</b>
+ترجمهٔ خودکار متن به فارسی (یا هر زبان با کد دو حرفی مثل en, ar).
+""",
+    "poll": """
+📊 <b>نظرسنجی</b>
+
+<b>دستورات قابل کپی:</b>
+<code>نظرسنجی سوال | گزینه۱ | گزینه۲ | گزینه۳</code>
+
+<b>کاربرد:</b>
+ساخت نظرسنجی در گروه با جداکنندهٔ «|» (حداکثر ۱۰ گزینه).
+""",
+    "purge": """
+🧹 <b>پاکسازی پیام‌های من</b>
+
+<b>دستورات قابل کپی:</b>
+<code>پاک من 10</code>
+
+<b>کاربرد:</b>
+حذف آخرین پیام‌های خودتان در همین چت (حداکثر ۱۰۰ پیام).
 """
 }
 
@@ -1018,6 +1099,19 @@ def get_main_menu(user_id):
             InlineKeyboardButton("پروفایل خودکار", callback_data=f"help_autoprofile_{user_id}_1", style="success")
         ],
         [InlineKeyboardButton("انقضا / زمان باقی‌مانده", callback_data=f"adv_expiry_{user_id}_1", style="danger")],
+        [
+            InlineKeyboardButton("🎉 سرگرمی", callback_data=f"help_fun_{user_id}_1", style="warning"),
+            InlineKeyboardButton("🔤 ابزار متن", callback_data=f"help_texttools_{user_id}_1", style="warning")
+        ],
+        [
+            InlineKeyboardButton("👤 مدیریت پروفایل", callback_data=f"help_profiletools_{user_id}_1", style="secondary"),
+            InlineKeyboardButton("🕐 زمان و وضعیت", callback_data=f"help_timetools_{user_id}_1", style="secondary")
+        ],
+        [
+            InlineKeyboardButton("🌐 مترجم", callback_data=f"help_translate_{user_id}_1", style="primary"),
+            InlineKeyboardButton("📊 نظرسنجی", callback_data=f"help_poll_{user_id}_1", style="primary")
+        ],
+        [InlineKeyboardButton("🧹 پاکسازی پیام‌های من", callback_data=f"help_purge_{user_id}_1", style="danger")],
         [InlineKeyboardButton("❌ بستن", callback_data=f"close_{user_id}", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)

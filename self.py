@@ -2362,52 +2362,16 @@ async def slowmode_off(client, message):
     except Exception as e:
         await message.edit(f"❌ **خطا:** `{str(e)}`")
 
-@app.on_message(filters.me & filters.text & ~filters.command([
-    "سیو", "پنل", "لیست فحش", "آنلاین", "دانلود", "ایدی", "تایم", 
-    "وضعیت", "لیست فونت", "تنظیم فونت", "قیمت", "اسپم", "بولد", 
-    "پاسخ", "دشمن", "فحش", "حذف", "لیست دشمن", "دشمنان", "پاک کردن دشمنان", 
-    "همه", "مدیا", "استیکر", "فوروارد", "ویس", "پیام", "فایل", "وضعیت قفل", 
-    "ریست قفل", "راهنمای قفل", 
-    "انتی لاگین", "ریکت", "حذف ریکت", "لیست ریکت", "پاکسازی ریکت",
-    "ویرایش",
-    "تنظیم بنر", "بنر همگانی", "لیست بنرها", "حذف بنر", "بنر همگانی خاموش", "بنر ارسال", "زمان بنر",
-    "فرمت",
-    "پینگ", "تعداد کانال ها", "تعداد گروه ها", "خروج همه کانال", "خروج همه گروه",
-    "اکشن",
-    "اینستا" 
-], prefixes=""))
-async def auto_html_format_messages(client, message):
-    if not any(format_settings.values()):
-        return
-    
-    original_text = message.text
-    if not original_text:
-        return
-    
-    formatted_text = original_text
-    for format_name, is_active in format_settings.items():
-        if is_active and format_name in html_tags:
-            try:
-                if format_name == "خط‌خورده":
-                    formatted_text = f"<s>{formatted_text}</s>"
-                else:
-                    formatted_text = html_tags[format_name].format(formatted_text)
-            except Exception as e:
-                print(f"❌ خطا در اعمال فرمت {format_name}: {e}")
-    if formatted_text != original_text:
-        try:
-            await message.edit_text(
-                formatted_text,
-                parse_mode=enums.ParseMode.HTML
-            )
-        except Exception as e:
-            print(f"❌ خطا در ویرایش پیام: {e}")
-            try:
-                await message.edit_text(original_text)
-            except:
-                pass
+# توجه: هندلر فرمت‌کنندهٔ خودکارِ متن (auto_html_format_messages) به انتهای فایل
+# منتقل شده تا به‌عنوان «آخرین» هندلر گروه اجرا شود. در Pyrogram فقط اولین هندلرِ
+# منطبق در هر گروه اجرا می‌شود؛ اگر این هندلرِ فراگیر وسط فایل بماند، همهٔ دستورهای
+# ثبت‌شده بعد از آن را بلع می‌کند. جای جدید: نزدیک انتهای فایل.
 @app.on_message(filters.me & filters.command("سیو", prefixes=""))
 async def save_command(client: Client, message: Message):
+    from pyrogram import ContinuePropagation
+    # «سیو حذفیات» و «سیو ادیت» دستورهای جداگانه‌ای هستند؛ بگذار هندلر مخصوصشان اجرا شود.
+    if len(message.command) >= 2 and message.command[1] in ("حذفیات", "ادیت"):
+        raise ContinuePropagation
     if len(message.command) < 2: 
         return await message.edit_text("**لطفا یوزرنیم کاربر را وارد کنید**\n\nمثال: `سیو @LuminousPath`")
     
@@ -4212,6 +4176,331 @@ async def remove_reaction_command(client, message):
     else:
         await message.edit("❌ **لطفاً روی پیام کاربر ریپلای کنید**")
 
+
+# ══════════════════════════════════════════════════════════════════════════
+#                      دستورهای پیشرفتهٔ جدید (Advanced)
+# ══════════════════════════════════════════════════════════════════════════
+import ast as _ast
+import operator as _op
+
+SELF_START_TIME = time.time()
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def _to_int(s, default=0):
+    try:
+        return int(str(s).translate(_FA_DIGITS))
+    except Exception:
+        return default
+
+
+_CALC_OPS = {
+    _ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
+    _ast.Div: _op.truediv, _ast.Pow: _op.pow, _ast.Mod: _op.mod,
+    _ast.FloorDiv: _op.floordiv, _ast.USub: _op.neg, _ast.UAdd: _op.pos,
+}
+
+
+def _calc_eval(node):
+    if isinstance(node, _ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, _ast.BinOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_calc_eval(node.left), _calc_eval(node.right))
+    if isinstance(node, _ast.UnaryOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_calc_eval(node.operand))
+    raise ValueError("عبارت نامعتبر")
+
+
+def safe_calc(expr: str):
+    expr = expr.translate(_FA_DIGITS).replace("×", "*").replace("÷", "/").replace("^", "**").replace("،", "")
+    tree = _ast.parse(expr, mode="eval")
+    return _calc_eval(tree.body)
+
+
+_FORTUNES = [
+    "الا یا ایها الساقی ادر کأساً و ناولها / که عشق آسان نمود اول ولی افتاد مشکل‌ها",
+    "بنشین بر لب جوی و گذر عمر ببین / کاین اشارت ز جهان گذران ما را بس",
+    "رسید مژده که ایام غم نخواهد ماند / چنان نماند چنین نیز هم نخواهد ماند",
+    "دوش وقت سحر از غصه نجاتم دادند / وندر آن ظلمت شب آب حیاتم دادند",
+    "مطلب طاعت و پیمان و صلاح از من مست / که به پیمانه‌کشی شهره شدم روز الست",
+]
+_JOKES = [
+    "به یارو میگن چرا کولر نداری؟ میگه چون پنجره باز می‌کنم تهویه میشه! 😄",
+    "معلم: جمع بزن ۲ و ۲. شاگرد: مساوی می‌شه ۴. معلم: آفرین! شاگرد: آفرین نداره که، خودت گفتی جمع کن! 😅",
+    "دکتر گفت روزی سه لیوان آب بخور، حالا موندم لیوانو از کجا گیر بیارم که سه بار توش آب باشه! 🤪",
+]
+_QUOTES = [
+    "«بزرگ‌ترین افتخار زندگی در این نیست که هرگز زمین نخوریم، بلکه در این است که بعد از هر زمین خوردن برخیزیم.»",
+    "«آینده از آنِ کسانی است که به زیبایی رؤیاهایشان ایمان دارند.»",
+    "«تنها راه انجام کارهای بزرگ، دوست داشتن کاری است که انجام می‌دهی.»",
+]
+_MAGIC8 = ["بله ✅", "قطعاً 💯", "به احتمال زیاد 👍", "شاید 🤔", "معلوم نیست 🌀",
+           "بعید می‌دانم 🙃", "خیر ❌", "اصلاً ❎", "بعداً بپرس ⏳"]
+
+
+@app.on_message(filters.me & filters.regex(r"^فال$"))
+async def fortune_command(client, message):
+    await message.edit(f"📜 **فال حافظ**\n\n{random.choice(_FORTUNES)}")
+
+
+@app.on_message(filters.me & filters.regex(r"^(سکه|شیر یا خط)$"))
+async def coinflip_command(client, message):
+    await message.edit("🪙 در حال پرتاب...")
+    await asyncio.sleep(1)
+    await message.edit(f"🪙 **{random.choice(['شیر 🦁', 'خط 📝'])}**")
+
+
+@app.on_message(filters.me & filters.regex(r"^گوی (.+)$", flags=re.DOTALL))
+async def magic8_command(client, message):
+    q = message.matches[0].group(1).strip()
+    await message.edit(f"🔮 **گوی جادویی**\n❓ {q}\n💬 {random.choice(_MAGIC8)}")
+
+
+@app.on_message(filters.me & filters.regex(r"^جوک$"))
+async def joke_command(client, message):
+    await message.edit(f"😂 {random.choice(_JOKES)}")
+
+
+@app.on_message(filters.me & filters.regex(r"^نقل$"))
+async def quote_command(client, message):
+    await message.edit(f"💭 {random.choice(_QUOTES)}")
+
+
+@app.on_message(filters.me & filters.regex(r"^حساب (.+)$"))
+async def calc_command(client, message):
+    expr = message.matches[0].group(1).strip()
+    try:
+        result = safe_calc(expr)
+        if isinstance(result, float) and result.is_integer():
+            result = int(result)
+        await message.edit(f"🧮 **ماشین‌حساب**\n`{expr}` = **{result}**")
+    except Exception:
+        await message.edit("❌ عبارت نامعتبر است. مثال: `حساب 2+3*4`")
+
+
+@app.on_message(filters.me & filters.regex(r"^برعکس (.+)$", flags=re.DOTALL))
+async def reverse_command(client, message):
+    text = message.matches[0].group(1)
+    await message.edit(text[::-1])
+
+
+@app.on_message(filters.me & filters.regex(r"^فاصله (.+)$", flags=re.DOTALL))
+async def spaced_command(client, message):
+    text = message.matches[0].group(1)
+    await message.edit(" ".join(list(text)))
+
+
+@app.on_message(filters.me & filters.regex(r"^تکرار ([\d۰-۹]+) (.+)$", flags=re.DOTALL))
+async def repeat_command(client, message):
+    count = min(_to_int(message.matches[0].group(1)), 20)
+    text = message.matches[0].group(2)
+    if count < 1:
+        return await message.edit("❌ تعداد نامعتبر است.")
+    await message.edit("\n".join([text] * count))
+
+
+@app.on_message(filters.me & filters.regex(r"^نظرسنجی (.+)$", flags=re.DOTALL))
+async def poll_command(client, message):
+    raw = message.matches[0].group(1)
+    parts = [p.strip() for p in raw.split("|") if p.strip()]
+    if len(parts) < 3:
+        return await message.edit("❌ استفاده:\n`نظرسنجی سوال | گزینه۱ | گزینه۲`")
+    question, options = parts[0], parts[1:11]
+    try:
+        await client.send_poll(message.chat.id, question, options)
+        await message.delete()
+    except Exception:
+        await message.edit("❌ ارسال نظرسنجی ممکن نشد (در این چت مجاز نیست).")
+
+
+@app.on_message(filters.me & filters.regex(r"^اسم (.+)$", flags=re.DOTALL))
+async def set_first_name_command(client, message):
+    name = message.matches[0].group(1).strip()[:64]
+    try:
+        await client.update_profile(first_name=name)
+        user_original_names[message.from_user.id] = name
+        await message.edit(f"✅ نام به «{name}» تغییر کرد.")
+    except Exception:
+        await message.edit("❌ تغییر نام ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^فامیل( .+)?$", flags=re.DOTALL))
+async def set_last_name_command(client, message):
+    grp = message.matches[0].group(1)
+    last = grp.strip()[:64] if grp else ""
+    try:
+        await client.update_profile(last_name=last)
+        await message.edit("✅ نام خانوادگی حذف شد." if not last else f"✅ نام خانوادگی به «{last}» تغییر کرد.")
+    except Exception:
+        await message.edit("❌ تغییر نام خانوادگی ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^بیو (?!تایم)(.+)$", flags=re.DOTALL))
+async def set_bio_command(client, message):
+    bio = message.matches[0].group(1).strip()[:140]
+    try:
+        await client.update_profile(bio=bio)
+        await message.edit("✅ بایو به‌روزرسانی شد.")
+    except Exception:
+        await message.edit("❌ تغییر بایو ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^ساعت$"))
+async def clock_now_command(client, message):
+    now = get_iran_now()
+    await message.edit(f"🕐 **ساعت:** `{now.strftime('%H:%M:%S')}`\n🌍 منطقهٔ زمانی: تهران")
+
+
+@app.on_message(filters.me & filters.regex(r"^تاریخ$"))
+async def date_now_command(client, message):
+    now = get_iran_now()
+    weekdays = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"]
+    wd = weekdays[now.weekday()]
+    text = f"📅 **تاریخ**\n{wd}\nمیلادی: `{now.strftime('%Y-%m-%d')}`"
+    try:
+        import jdatetime
+        j = jdatetime.datetime.fromgregorian(datetime=now)
+        text += f"\nشمسی: `{j.strftime('%Y/%m/%d')}`"
+    except Exception:
+        pass
+    await message.edit(text)
+
+
+@app.on_message(filters.me & filters.regex(r"^وضعیت سلف$"))
+async def selfbot_status_command(client, message):
+    uptime = int(time.time() - SELF_START_TIME)
+    h, rem = divmod(uptime, 3600)
+    m, s = divmod(rem, 60)
+    start = datetime.now()
+    ping_msg = await message.edit("⏳ ...")
+    ping = (datetime.now() - start).microseconds / 1000
+    await ping_msg.edit(
+        "🤖 **وضعیت سلف**\n\n"
+        f"⏱ آپ‌تایم: `{h}h {m}m {s}s`\n"
+        f"🏓 پینگ: `{ping:.1f} ms`\n"
+        f"🕐 ساعت: `{get_iran_now().strftime('%H:%M:%S')}`"
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^شمارش ([\d۰-۹]+)$"))
+async def countdown_command(client, message):
+    n = min(_to_int(message.matches[0].group(1)), 30)
+    if n < 1:
+        return await message.edit("❌ عدد نامعتبر است.")
+    for i in range(n, 0, -1):
+        try:
+            await message.edit(f"⏳ **{i}**")
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+    await message.edit("🚀 **تمام!**")
+
+
+@app.on_message(filters.me & filters.regex(r"^تلگرافی (.+)$", flags=re.DOTALL))
+async def typewriter_command(client, message):
+    text = message.matches[0].group(1)[:100]
+    shown = ""
+    for ch in text:
+        shown += ch
+        try:
+            await message.edit(shown + "▌")
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except Exception:
+            pass
+        await asyncio.sleep(0.12)
+    try:
+        await message.edit(text)
+    except Exception:
+        pass
+
+
+@app.on_message(filters.me & filters.regex(r"^پاک من ([\d۰-۹]+)$"))
+async def purge_my_messages_command(client, message):
+    n = min(_to_int(message.matches[0].group(1)), 100)
+    me = await client.get_me()
+    ids = []
+    try:
+        async for msg in client.get_chat_history(message.chat.id, limit=300):
+            if msg.id == message.id:
+                continue
+            if msg.from_user and msg.from_user.id == me.id:
+                ids.append(msg.id)
+                if len(ids) >= n:
+                    break
+    except Exception:
+        pass
+    deleted = 0
+    if ids:
+        try:
+            await client.delete_messages(message.chat.id, ids)
+            deleted = len(ids)
+        except Exception:
+            pass
+    try:
+        await message.edit(f"🧹 **{deleted} پیام حذف شد**")
+        await asyncio.sleep(2)
+        await message.delete()
+    except Exception:
+        pass
+
+
+def _translate_sync(text, target="fa"):
+    url = "https://translate.googleapis.com/translate_a/single"
+    params = {"client": "gtx", "sl": "auto", "tl": target, "dt": "t", "q": text}
+    r = requests.get(url, params=params, timeout=10)
+    data = r.json()
+    return "".join(seg[0] for seg in data[0] if seg and seg[0])
+
+
+@app.on_message(filters.me & filters.regex(r"^مترجم (.+)$", flags=re.DOTALL))
+async def translate_command(client, message):
+    raw = message.matches[0].group(1).strip()
+    target = "fa"
+    m = re.match(r"^([a-zA-Z]{2})\s+(.+)$", raw, flags=re.DOTALL)
+    if m:
+        target, raw = m.group(1).lower(), m.group(2)
+    await message.edit("🔄 در حال ترجمه...")
+    try:
+        result = await asyncio.to_thread(_translate_sync, raw, target)
+        await message.edit(f"🌐 **ترجمه ({target})**\n\n{result}")
+    except Exception:
+        await message.edit("❌ ترجمه ناموفق بود (خطای شبکه).")
+
+
+# ── آخرین هندلر گروه: فرمت‌کنندهٔ خودکارِ متنِ خروجی ─────────────────────────
+# چون آخرین هندلرِ ثبت‌شده است، فقط پیام‌هایی که هیچ دستوری آن‌ها را نگرفته را
+# پردازش می‌کند و دیگر مانع اجرای دستورها نمی‌شود.
+@app.on_message(filters.me & filters.text)
+async def auto_html_format_messages(client, message):
+    if not any(format_settings.values()):
+        return
+    original_text = message.text
+    if not original_text:
+        return
+    formatted_text = original_text
+    for format_name, is_active in format_settings.items():
+        if is_active and format_name in html_tags:
+            try:
+                if format_name == "خط‌خورده":
+                    formatted_text = f"<s>{formatted_text}</s>"
+                else:
+                    formatted_text = html_tags[format_name].format(formatted_text)
+            except Exception as e:
+                print(f"❌ خطا در اعمال فرمت {format_name}: {e}")
+    if formatted_text != original_text:
+        try:
+            await message.edit_text(formatted_text, parse_mode=enums.ParseMode.HTML)
+        except Exception as e:
+            print(f"❌ خطا در ویرایش پیام: {e}")
+            try:
+                await message.edit_text(original_text)
+            except Exception:
+                pass
+
+
 def check_commands_from_helper():
     while True:
         try:
@@ -4355,7 +4644,76 @@ async def execute_command_from_helper(command, user_id):
                 except:
                     pass
             return
-                
+
+        # ── قابلیت‌های پیشرفته که از پنل تاگل می‌شوند ─────────────────────────
+        if command in ("بیو تایم روشن", "بیو تایم خاموش"):
+            global bio_time_enabled, original_bio
+            if command.endswith("روشن"):
+                bio_time_enabled = True
+                ensure_time_updater(app)
+                await update_bio_with_time(app)
+            else:
+                bio_time_enabled = False
+                try:
+                    if original_bio is not None:
+                        await app.update_profile(bio=original_bio)
+                    original_bio = None
+                except Exception:
+                    pass
+            save_state()
+            print(f"✅ بیو تایم: {command}")
+            return
+
+        if command in ("سیو حذفیات روشن", "سیو حذفیات خاموش"):
+            global save_deleted_enabled
+            save_deleted_enabled = command.endswith("روشن")
+            save_state()
+            print(f"✅ سیو حذفیات: {save_deleted_enabled}")
+            return
+
+        if command in ("سیو ادیت روشن", "سیو ادیت خاموش"):
+            global save_edited_enabled
+            save_edited_enabled = command.endswith("روشن")
+            save_state()
+            print(f"✅ سیو ادیت: {save_edited_enabled}")
+            return
+
+        if command in ("پروفایل خودکار روشن", "پروفایل خودکار خاموش"):
+            global auto_profile_enabled, auto_profile_task
+            if command.endswith("روشن"):
+                auto_profile_enabled = True
+                if auto_profile_names and (auto_profile_task is None or auto_profile_task.done()):
+                    auto_profile_task = asyncio.create_task(auto_profile_loop(app))
+            else:
+                auto_profile_enabled = False
+            save_state()
+            print(f"✅ پروفایل خودکار: {auto_profile_enabled}")
+            return
+
+        if command in ("انقضا", "expiry"):
+            hours = None
+            try:
+                if USER_ID and os.path.exists(config.DATABASE_FILE):
+                    with open(config.DATABASE_FILE, "r", encoding="utf-8") as f:
+                        _d = json.load(f)
+                    hours = int(_d.get("credits", {}).get(str(USER_ID), 0) or 0)
+            except Exception:
+                hours = None
+            if hours is None:
+                result = "ℹ️ اطلاعات انقضا در دسترس نیست."
+            elif hours <= 0:
+                result = "⌛️ اعتبار سلف شما به پایان رسیده است."
+            else:
+                expire_at = get_iran_now() + timedelta(hours=hours)
+                result = (f"⏳ زمان باقی‌مانده سلف\n\n💰 اعتبار: {hours} ساعت\n"
+                          f"📅 انقضا: {expire_at.strftime('%Y-%m-%d %H:%M')}")
+            try:
+                with open(f"reaction_result_{user_id}.json", "w", encoding="utf-8") as f:
+                    json.dump({"result": result, "timestamp": time.time()}, f, ensure_ascii=False, indent=4)
+            except Exception:
+                pass
+            return
+
     except Exception as e:
         print(f"❌ خطا در اجرای دستور {command}: {e}")
         import traceback
