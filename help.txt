@@ -1,0 +1,24 @@
+کتابخونه های زیرو نصب کنید
+pip install pyrogram
+pip install datetime
+pip install pytz
+pip install --upgrade python-telegram-bot
+
+فایل bot.py
+از خط 10 تا 21 ادیت بشه
+خط های 24 و 25 و 26 هم در صورت نیاز تغییر بدید
+فایل helper.py
+
+فقط خط 9 توکن ربات بزارید
+
+فایل self.py
+
+خط 18 و 23 و 24 اطلاعات جایگذاری بشه
+
+فقط دوتا فایل رو ران کنید یکی
+
+bot.py
+
+و دیگری
+
+helper.py

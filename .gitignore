@@ -1,0 +1,36 @@
+# محرمانه‌ها
+.env
+
+# نشست‌های تلگرام (حساس! هرگز کامیت نشود)
+sessions/
+*.session
+*.session-journal
+
+# پایگاه‌داده و وضعیت زمان اجرا
+database.json
+database.json.bak
+selfbot_state_*.json
+selfbot_state.json
+scheduled_messages.json
+mmauto_reactions.json
+pishi_tasks.json
+selfbot_commands_*.json
+settings_*.json
+reaction_result_*.json
+panel_photo.json
+process_*.pid
+
+# داده‌های تولیدشده
+backups/
+saved_photos/
+temp_*.jpg
+temp_*.mp4
+temp_thumb_*.jpg
+enemies.txt
+insults.txt
+
+# پایتون
+__pycache__/
+*.pyc
+.venv/
+venv/
