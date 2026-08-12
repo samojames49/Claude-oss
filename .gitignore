@@ -29,6 +29,16 @@ temp_thumb_*.jpg
 enemies.txt
 insults.txt
 
+# ربات پلیر (player/)
+player/.env
+player/downloads/
+player/cache/
+player/sessions/
+player/player_db.json
+player/player_db.corrupt.json
+player/player.log*
+player/cookies.txt
+
 # پایتون
 __pycache__/
 *.pyc
