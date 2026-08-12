@@ -359,12 +359,12 @@ class PlayerService:
                 continue
 
             listeners = await calls_service.listeners_count(chat_id)
-            if listeners <= 0:
+            if listeners == 0:
                 empty_since = queues.mark_empty(chat_id)
                 if now - empty_since >= config.EMPTY_CALL_TIMEOUT_SECONDS:
                     await self.cleanup(chat_id, reason_key="auto_left_empty")
                     continue
-            else:
+            elif listeners > 0:
                 queues.clear_empty(chat_id)
 
             if queues.is_paused(chat_id):

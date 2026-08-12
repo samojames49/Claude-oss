@@ -199,17 +199,21 @@ class CallsService:
         except Exception:  # noqa: BLE001
             return False
 
-    async def participants(self, chat_id: int) -> list[Any]:
+    async def participants(self, chat_id: int) -> list[Any] | None:
+        """لیست شرکت‌کنندگان ویس‌چت؛ در صورت خطا None (یعنی «نامعلوم»)."""
         assistant = self.assistant(chat_id)
         try:
             return list(await assistant.calls.get_participants(chat_id) or [])
-        except Exception:  # noqa: BLE001
-            return []
+        except Exception as error:  # noqa: BLE001
+            LOGGER.debug("خواندن شرکت‌کنندگان %s ناموفق بود: %s", chat_id, error)
+            return None
 
     async def listeners_count(self, chat_id: int) -> int:
-        """تعداد شنوندگان واقعی (بدون حساب کردن خود اسیستنت)."""
+        """تعداد شنوندگان (بدون خود اسیستنت)؛ ‎-1 یعنی قابل تشخیص نبود."""
         assistant = self.assistant(chat_id)
         people = await self.participants(chat_id)
+        if people is None:
+            return -1
         return len([person for person in people if getattr(person, "user_id", 0) != assistant.id])
 
     def ping(self) -> float:
