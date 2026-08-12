@@ -46,6 +46,18 @@ STRINGS = {
         "• `/ping`, `/stats` bot status\n"
         "• inline search: `@{bot_username} song name`"
     ),
+    "help_call": (
+        "🎙 **Voice chat & games**\n\n"
+        "• `/playerpanel` full settings panel — `/menupv` the same panel in PM\n"
+        "• `/callstats` presence stats (`/callstats 7`, `/callstats friday`) — `/id` user card\n"
+        "• `/callsecurity on` suspicious behaviour reports — `/muteonjoin`, `/accountage 7`\n"
+        "• `/hotseat [minutes]` start the game — `/addguest` / `/delguest` (reply)\n"
+        "  `/nextguest`, `/hotseatlist`, `/endhotseat`\n"
+        "• `/live` TV and satellite channels — `/film`, `/serial` video search\n"
+        "• `/subtitle` (reply to an srt file) burn subtitles into the video\n"
+        "• `/setcalltitle`, `/invitecall`, `/invitevip`\n"
+        "• `/timeplay 01:20`, `/mediavolume 150`, `/dl <link>`"
+    ),
     "help_admin": (
         "⚙️ **Group management**\n\n"
         "• `/settings` group settings panel\n"
@@ -73,6 +85,10 @@ STRINGS = {
     "button_close": "✖️ Close",
     "button_back": "◀️ Back",
     "button_home": "🏠 Home",
+    "button_pick_play": "🎧 Play audio",
+    "button_pick_vplay": "🎬 Play video",
+    "button_pick_song": "⬇️ Audio file",
+    "button_pick_video": "⬇️ Video file",
     # ── errors ───────────────────────────────────────────────────────────────
     "err_generic": "❌ Something went wrong:\n`{error}`",
     "err_admin_only": "🚫 This command is for **group admins** only.",
@@ -223,6 +239,8 @@ STRINGS = {
     "lyrics_not_found": "No lyrics found for that track.",
     "lyrics_disabled": "Lyrics feature is disabled.",
     "search_header": "🔍 **Search results for:** {query}\n\nPick one:",
+    "film_usage": "Send the movie name:\n`/film movie name`",
+    "serial_usage": "Send the series name:\n`/serial series name`",
     "inline_no_query": "Type a song name…",
     "inline_play_hint": "Send the result in a group to play it.",
     "ping_reply": (
@@ -400,6 +418,55 @@ STRINGS = {
     "mute_join_off": "🎤 Mute on join disabled.",
     "call_message_on": "💬 Voice chat service messages are kept in the group.",
     "call_message_off": "💬 Voice chat service messages will be deleted.",
+    # ── hot seat game ────────────────────────────────────────────────────────
+    "hotseat_started": (
+        "🔥 **Hot seat started!**\n\n"
+        "▫️ Turn length: **{turn}**\n"
+        "▫️ Guests: **{count}**\n\n"
+        "Reply to a member with `/addguest` to line them up."
+    ),
+    "hotseat_turn": (
+        "🔥 **Hot seat**\n\n"
+        "🎤 It's {guest}'s turn\n"
+        "⏳ Turn length: **{turn}**\n"
+        "👥 Waiting: **{waiting}**"
+    ),
+    "hotseat_status": (
+        "🔥 **Hot seat — {chat}**\n\n"
+        "🎤 On the seat: {guest}\n"
+        "⏳ Remaining: **{left}**\n"
+        "🔁 Turns played: **{served}**\n\n"
+        "👥 **Guest queue:**\n{waiting}"
+    ),
+    "hotseat_waiting_item": "**{index}.** {guest}\n",
+    "hotseat_no_guests": "The guest queue is empty.",
+    "hotseat_empty_seat": "nobody on the seat",
+    "hotseat_unlimited": "unlimited",
+    "hotseat_paused": "⏸ Turn paused; the timer is frozen.",
+    "hotseat_resumed": "▶️ Turn resumed.",
+    "hotseat_finished": "🔥 **Hot seat finished.**\n🔁 Turns played: **{served}**",
+    "hotseat_already": "🔥 A hot seat game is already running; end it with `/endhotseat` first.",
+    "hotseat_not_active": "🔥 No hot seat game is running; start one with `/hotseat`.",
+    "hotseat_usage": (
+        "🔥 **Hot seat**\n\n"
+        "• `/hotseat` start with the default turn length\n"
+        "• `/hotseat 3` three minutes per turn (`/hotseat 0` for unlimited)\n"
+        "• reply to a member to make them the first guest."
+    ),
+    "hotseat_need_guest": "Reply to the member or send their id/username.",
+    "hotseat_guest_added": "🔥 {user} joined the hot seat queue (position {position}).",
+    "hotseat_guest_exists": "{user} is already in the game.",
+    "hotseat_guest_removed": "🔥 {user} was removed from the game.",
+    "hotseat_guest_missing": "{user} is not in the game.",
+    "hotseat_limit": "Each game allows at most {limit} guests.",
+    "hotseat_mic_hint": (
+        "\n\n⚠️ I could not manage the microphones; the assistant needs group admin rights "
+        "with “manage video chats”."
+    ),
+    "button_hotseat_next": "⏭ Next guest",
+    "button_hotseat_pause": "⏸ Pause turn",
+    "button_hotseat_resume": "▶️ Resume turn",
+    "button_hotseat_end": "⏹ End game",
     # ── logging ──────────────────────────────────────────────────────────────
     "log_new_chat": "🆕 **New chat**\nTitle: {title}\nID: `{chat_id}`\nAdded by: {user}",
     "log_left_chat": "👋 **Left chat**\nTitle: {title}\nID: `{chat_id}`",

@@ -16,6 +16,7 @@ from . import callstats
 from .calls import calls_service
 from .clients import assistant_for, bot
 from .db import db
+from .hotseat import hotseat
 from .lang import strings_for
 from .security import security
 
@@ -41,6 +42,12 @@ class CallWatchService:
 
     async def mark_closed(self, chat_id: int) -> None:
         """آخرین نمونه را ثبت و گزارش‌های پایان کال را ارسال می‌کند."""
+        if hotseat.is_active(chat_id):
+            # با بسته‌شدن ویس‌چت، بازی صندلی داغ هم بی‌معنا می‌شود
+            session = await hotseat.stop(chat_id)
+            if session is not None:
+                s = strings_for(chat_id)
+                await self._send(chat_id, s("hotseat_finished", served=session.served))
         if chat_id not in self._open:
             return
         await self._sample(chat_id, closing=True)

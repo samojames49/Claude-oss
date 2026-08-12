@@ -42,6 +42,9 @@ def _all_button_data() -> set[str]:
         keyboards.close_only("fa"),
         keyboards.search_results("fa", "tok", 6),
         keyboards.search_results("fa", "tok", 6, video=True),
+        keyboards.search_actions("fa", "tok", 0),
+        keyboards.hotseat_panel("fa"),
+        keyboards.hotseat_panel("fa", paused=True),
         keyboards.settings_panel(
             "fa",
             {

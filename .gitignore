@@ -43,4 +43,7 @@ player/cookies.txt
 __pycache__/
 *.pyc
 .venv/
+.venv-*/
 venv/
+.pytest_cache/
+.ruff_cache/

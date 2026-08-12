@@ -14,12 +14,13 @@ from ..core.decorators import callback_handler, player_handler
 from ..core.filters import argument, command
 from ..core.queues import queues
 from ..core.service import player
+from ..core.targets import playback_chat
 from ..core.ui import announce, requester_of
 from ..platforms import lyrics as lyrics_api
 from ..platforms import resolver, youtube
 from ..utils.formatters import human_bytes, seconds_to_time
 from ..utils.http import download_file
-from ..utils.keyboards import search_results
+from ..utils.keyboards import search_actions, search_results
 from ..utils.logger import get_logger
 
 LOGGER = get_logger("tools")
@@ -47,10 +48,40 @@ def _prune_cache() -> None:
 
 
 # ── جستجو ─────────────────────────────────────────────────────────────────────
-@Client.on_message(command(["search", "yt"], bare=["جستجو", "سرچ"]), group=1)
+SEARCH_ALIASES = ["جستجو", "سرچ", "سرچ یوتیوب", "جستجو یوتیوب", "search youtube"]
+
+
+@Client.on_message(command(["search", "yt"], bare=SEARCH_ALIASES), group=1)
 @player_handler(group_only=False)
 async def search_command(_client: Client, message, s):
+    await _search_and_offer(message, s, argument(message))
+
+
+@Client.on_message(command(["film", "movie"], bare=["فیلم"]), group=1)
+@player_handler(group_only=False)
+async def film_command(_client: Client, message, s):
+    """جستجوی فیلم و پخش ویدیویی آن در ویس‌چت."""
     query = argument(message)
+    if not query:
+        await message.reply_text(s("film_usage"))
+        return
+    await _search_and_offer(message, s, f"{query} full movie", title=query, video=True)
+
+
+@Client.on_message(command(["serial", "series"], bare=["سریال"]), group=1)
+@player_handler(group_only=False)
+async def serial_command(_client: Client, message, s):
+    """جستجوی سریال و پخش ویدیویی آن در ویس‌چت."""
+    query = argument(message)
+    if not query:
+        await message.reply_text(s("serial_usage"))
+        return
+    await _search_and_offer(message, s, f"{query} full episode", title=query, video=True)
+
+
+async def _search_and_offer(
+    message, s, query: str, *, title: str | None = None, video: bool = False
+) -> None:
     if not query:
         await message.reply_text(s("err_need_query"))
         return
@@ -60,7 +91,7 @@ async def search_command(_client: Client, message, s):
         await status.edit_text(s("err_no_result"))
         return
 
-    lines = [s("search_header", query=query), ""]
+    lines = [s("search_header", query=title or query), ""]
     for index, item in enumerate(results, start=1):
         lines.append(
             f"**{index}.** [{item.title}]({item.url})\n"
@@ -69,20 +100,46 @@ async def search_command(_client: Client, message, s):
     token = _cache_results(results)
     await status.edit_text(
         "\n".join(lines),
-        reply_markup=search_results(s.language, token, len(results)),
+        reply_markup=search_results(s.language, token, len(results), video=video),
         disable_web_page_preview=True,
     )
 
 
 @Client.on_callback_query(filters.regex(r"^pick:"))
 @callback_handler()
-async def pick_callback(_client: Client, query, s):
+async def pick_callback(client: Client, query, s):
     _, mode, token, index = query.data.split(":", 3)
     results = _get_cached(token)
     try:
         chosen = results[int(index)]
     except (ValueError, IndexError):
         await query.answer(s("err_no_result"), show_alert=True)
+        return
+
+    if mode == "sel":
+        await query.message.edit_reply_markup(
+            reply_markup=search_actions(s.language, token, int(index))
+        )
+        await query.answer(chosen.title[:190])
+        return
+
+    if mode == "back":
+        await query.message.edit_reply_markup(
+            reply_markup=search_results(s.language, token, len(results))
+        )
+        await query.answer()
+        return
+
+    if mode in ("song", "video"):
+        await query.answer(s("downloading"))
+        await _send_media_file(
+            client,
+            query.message,
+            s,
+            chosen,
+            video=mode == "video",
+            requester=requester_of(query),
+        )
         return
 
     chat = query.message.chat
@@ -98,7 +155,7 @@ async def pick_callback(_client: Client, query, s):
         requester_id=requester_id,
         requester_name=requester_name,
     )
-    state, position = await player.play_or_queue(chat.id, track)
+    state, position = await player.play_or_queue(playback_chat(chat.id), track)
     await announce(query.message, s, state, position, track)
 
 
@@ -136,7 +193,21 @@ async def _download_media(client: Client, message, s, *, video: bool) -> None:
     if result is None:
         await status.edit_text(s("err_no_result"))
         return
+    await _send_media_file(client, message, s, result, video=video, status=status)
 
+
+async def _send_media_file(
+    _client: Client,
+    message,
+    s,
+    result: youtube.SearchResult,
+    *,
+    video: bool,
+    status=None,
+    requester: tuple[int, str] | None = None,
+) -> None:
+    """دانلود یک نتیجهٔ یوتیوب و ارسال آن به‌عنوان فایل صوتی/ویدیویی."""
+    status = status or await message.reply_text(s("downloading"))
     limit = config.DURATION_LIMIT_MINUTES
     if result.duration and limit and result.duration > limit * 60:
         await status.edit_text(
@@ -155,7 +226,7 @@ async def _download_media(client: Client, message, s, *, video: bool) -> None:
         await status.edit_text(s("err_file_too_big", limit=2000))
         return
 
-    requester_id, requester_name = requester_of(message)
+    requester_id, requester_name = requester or requester_of(message)
     caption = s(
         "song_caption",
         title=result.title,

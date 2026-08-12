@@ -114,6 +114,10 @@ CALL_SECURITY_ENABLED = _bool("CALL_SECURITY_ENABLED", False)
 CALL_SECURITY_MIN_AGE_DAYS = _int("CALL_SECURITY_MIN_AGE_DAYS", 7) or 7
 CALL_SECURITY_MAX_JOINS = _int("CALL_SECURITY_MAX_JOINS", 5) or 5
 
+# ── صندلی داغ ─────────────────────────────────────────────────────────────────
+HOTSEAT_TURN_SECONDS = _int("HOTSEAT_TURN_SECONDS", 180) or 180  # ۰ یعنی بی‌زمان
+HOTSEAT_MAX_GUESTS = _int("HOTSEAT_MAX_GUESTS", 30) or 30
+
 # ── پخش زنده تلویزیون/ماهواره ────────────────────────────────────────────────
 LIVE_CHANNELS_FILE = _str("LIVE_CHANNELS_FILE", "")  # پیش‌فرض: player/data/live_channels.json
 

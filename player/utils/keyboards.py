@@ -57,9 +57,10 @@ def help_panel(lang: str) -> InlineKeyboardMarkup:
                 _button("🧰 " + _section(lang, "help_tools"), "help:tools"),
             ],
             [
+                _button("🎙 " + _section(lang, "help_call"), "help:call"),
                 _button("⚙️ " + _section(lang, "help_admin"), "help:admin"),
-                _button("🛡 " + _section(lang, "help_sudo"), "help:sudo"),
             ],
+            [_button("🛡 " + _section(lang, "help_sudo"), "help:sudo")],
             [_button(s("button_close"), "close")],
         ]
     )
@@ -70,6 +71,7 @@ _SECTION_TITLES = {
     "help_control": {"fa": "کنترل", "en": "Controls"},
     "help_queue": {"fa": "صف", "en": "Queue"},
     "help_tools": {"fa": "ابزار", "en": "Tools"},
+    "help_call": {"fa": "ویس‌چت و بازی", "en": "Voice chat"},
     "help_admin": {"fa": "مدیریت", "en": "Admin"},
     "help_sudo": {"fa": "سودو", "en": "Sudo"},
 }
@@ -176,9 +178,13 @@ def language_panel(lang: str) -> InlineKeyboardMarkup:
 
 
 def search_results(lang: str, token: str, count: int, video: bool = False) -> InlineKeyboardMarkup:
-    """دکمه‌های انتخاب نتیجهٔ جستجو؛ token کلید کش نتایج است."""
+    """دکمه‌های انتخاب نتیجهٔ جستجو؛ token کلید کش نتایج است.
+
+    با `video=True` انتخاب هر شماره مستقیم ویدیویی پخش می‌شود، وگرنه منوی کارها
+    (پخش صوتی/ویدیویی یا دریافت فایل) باز می‌شود.
+    """
     s = Strings(lang)
-    prefix = "vplay" if video else "play"
+    prefix = "vplay" if video else "sel"
     rows: list[list[InlineKeyboardButton]] = []
     row: list[InlineKeyboardButton] = []
     for index in range(count):
@@ -190,6 +196,27 @@ def search_results(lang: str, token: str, count: int, video: bool = False) -> In
         rows.append(row)
     rows.append([_button(s("button_close"), "close")])
     return InlineKeyboardMarkup(rows)
+
+
+def search_actions(lang: str, token: str, index: int) -> InlineKeyboardMarkup:
+    """کارهای ممکن روی یک نتیجهٔ جستجو."""
+    s = Strings(lang)
+    return InlineKeyboardMarkup(
+        [
+            [
+                _button(s("button_pick_play"), f"pick:play:{token}:{index}"),
+                _button(s("button_pick_vplay"), f"pick:vplay:{token}:{index}"),
+            ],
+            [
+                _button(s("button_pick_song"), f"pick:song:{token}:{index}"),
+                _button(s("button_pick_video"), f"pick:video:{token}:{index}"),
+            ],
+            [
+                _button(s("button_back"), f"pick:back:{token}:{index}"),
+                _button(s("button_close"), "close"),
+            ],
+        ]
+    )
 
 
 def live_categories(lang: str, categories: list) -> InlineKeyboardMarkup:
@@ -284,6 +311,25 @@ def player_section(lang: str, section: str, values: dict) -> InlineKeyboardMarku
         )
     rows.append([_button(s("button_back"), "pnl:home"), _button(s("button_close"), "close")])
     return InlineKeyboardMarkup(rows)
+
+
+def hotseat_panel(lang: str, *, paused: bool = False) -> InlineKeyboardMarkup:
+    """کنترل بازی صندلی داغ زیر پیام نوبت."""
+    s = Strings(lang)
+    hold = (
+        _button(s("button_hotseat_resume"), "hs:resume")
+        if paused
+        else _button(s("button_hotseat_pause"), "hs:pause")
+    )
+    return InlineKeyboardMarkup(
+        [
+            [_button(s("button_hotseat_next"), "hs:next"), hold],
+            [
+                _button(s("button_refresh"), "hs:status"),
+                _button(s("button_hotseat_end"), "hs:end"),
+            ],
+        ]
+    )
 
 
 def close_only(lang: str) -> InlineKeyboardMarkup:
