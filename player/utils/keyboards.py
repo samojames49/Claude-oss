@@ -192,5 +192,39 @@ def search_results(lang: str, token: str, count: int, video: bool = False) -> In
     return InlineKeyboardMarkup(rows)
 
 
+def live_categories(lang: str, categories: list) -> InlineKeyboardMarkup:
+    """منوی دستهٔ شبکه‌های پخش زنده."""
+    s = Strings(lang)
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for entry in categories:
+        row.append(_button(entry.title, f"live:cat:{entry.id}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([_button(s("button_close"), "close")])
+    return InlineKeyboardMarkup(rows)
+
+
+def live_channels(lang: str, category_id: str, channels: list) -> InlineKeyboardMarkup:
+    """منوی شبکه‌های یک دسته؛ هر دکمه شمارهٔ شبکه را می‌فرستد."""
+    s = Strings(lang)
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for index, item in enumerate(channels):
+        row.append(_button(item.name, f"live:play:{category_id}:{index}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append(
+        [_button(s("button_back"), "live:home"), _button(s("button_close"), "close")]
+    )
+    return InlineKeyboardMarkup(rows)
+
+
 def close_only(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[_button(Strings(lang)("button_close"), "close")]])

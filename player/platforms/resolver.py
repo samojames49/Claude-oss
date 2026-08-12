@@ -31,9 +31,11 @@ def _check_duration(duration: int, limit_minutes: int) -> None:
         raise DurationLimit(seconds_to_time(duration), limit_minutes)
 
 
-async def _attach_source(track: Track, target: str, video: bool) -> Track:
+async def _attach_source(
+    track: Track, target: str, video: bool, *, force_download: bool = False
+) -> Track:
     """آماده‌سازی مسیر پخش: لینک مستقیم یا فایل دانلودشده."""
-    if config.STREAM_MODE == "download":
+    if force_download or config.STREAM_MODE == "download":
         path = await youtube.download(target, video=video)
         if path:
             track.source = path
@@ -61,6 +63,7 @@ async def track_from_result(
     requester_name: str = "",
     limit_minutes: int | None = None,
     prepare: bool = True,
+    download: bool = False,
 ) -> Track:
     """ساخت Track از نتیجهٔ جستجو یا لینک یوتیوب."""
     limit = config.DURATION_LIMIT_MINUTES if limit_minutes is None else limit_minutes
@@ -80,7 +83,9 @@ async def track_from_result(
         requester_name=requester_name,
     )
     if prepare:
-        await _attach_source(track, result.url, video)
+        await _attach_source(track, result.url, video, force_download=download)
+    else:
+        track.extra["download"] = download
     return track
 
 
@@ -92,6 +97,7 @@ async def resolve_query(
     requester_name: str = "",
     limit_minutes: int | None = None,
     playlist_limit: int = 20,
+    download: bool = False,
 ) -> Resolved:
     """درخواست متنی کاربر را به یک یا چند آیتم پخش تبدیل می‌کند."""
     text = (query or "").strip()
@@ -139,6 +145,7 @@ async def resolve_query(
                             requester_name=requester_name,
                             limit_minutes=limit,
                             prepare=index == 0,  # بقیه هنگام نوبت پخش آماده می‌شوند
+                            download=download,
                         )
                     )
                 except DurationLimit:
@@ -156,6 +163,7 @@ async def resolve_query(
         requester_id=requester_id,
         requester_name=requester_name,
         limit_minutes=limit,
+        download=download,
     )
     return Resolved(tracks=[track])
 
@@ -167,4 +175,6 @@ async def prepare_track(track: Track) -> Track:
     if track.source and track.source != track.url and not youtube.is_youtube_url(track.source):
         return track  # از قبل لینک مستقیم دارد
     target = track.url or track.source
-    return await _attach_source(track, target, track.video)
+    return await _attach_source(
+        track, target, track.video, force_download=bool(track.extra.get("download"))
+    )

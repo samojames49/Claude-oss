@@ -8,6 +8,7 @@ from ..core.decorators import player_handler
 from ..core.filters import argument, command
 from ..core.queues import queues
 from ..core.service import player
+from ..core.targets import playback_chat
 from ..utils.formatters import to_latin_digits
 from ..utils.keyboards import player_panel, queue_panel
 
@@ -15,7 +16,7 @@ from ..utils.keyboards import player_panel, queue_panel
 @Client.on_message(command(["queue", "playlist", "q"], bare=["صف", "لیست"]) & filters.group, group=1)
 @player_handler(require_active=True)
 async def queue_command(_client: Client, message, s):
-    text = await player.queue_text(message.chat.id)
+    text = await player.queue_text(playback_chat(message.chat.id))
     await message.reply_text(text, reply_markup=queue_panel(s.language))
 
 
@@ -25,7 +26,7 @@ async def queue_command(_client: Client, message, s):
 )
 @player_handler(require_active=True)
 async def current_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     text = await player.status_text(chat_id)
     await message.reply_text(
         text,
@@ -44,7 +45,7 @@ async def remove_command(_client: Client, message, s):
     if not raw.isdigit():
         await message.reply_text(s("err_invalid_number"))
         return
-    removed = queues.remove(message.chat.id, int(raw))
+    removed = queues.remove(playback_chat(message.chat.id), int(raw))
     if removed is None:
         await message.reply_text(s("err_invalid_number"))
         return
@@ -54,5 +55,5 @@ async def remove_command(_client: Client, message, s):
 @Client.on_message(command(["clear", "clearqueue"], bare=["پاک کردن صف"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def clear_command(_client: Client, message, s):
-    queues.clear(message.chat.id)
+    queues.clear(playback_chat(message.chat.id))
     await message.reply_text(s("queue_cleared"))

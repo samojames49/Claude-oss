@@ -10,6 +10,7 @@ from ..utils.logger import get_logger
 from .db import db
 from .errors import NoResult
 from .service import player, resolve_and_play
+from .targets import playback_chat
 from .track import Track
 
 LOGGER = get_logger("ui")
@@ -70,9 +71,10 @@ async def play_request(
     query: str = "",
     video: bool = False,
     force: bool = False,
+    download: bool = False,
 ) -> None:
     """مسیر کامل یک درخواست پخش (فایل ریپلای‌شده یا عبارت/لینک)."""
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     requester_id, requester_name = requester_of(message)
     replied = getattr(message, "reply_to_message", None)
 
@@ -96,7 +98,7 @@ async def play_request(
         await message.reply_text(s("err_need_query"))
         return
 
-    status = await message.reply_text(s("searching"))
+    status = await message.reply_text(s("downloading") if download else s("searching"))
     try:
         state, position, track = await resolve_and_play(
             chat_id,
@@ -105,6 +107,7 @@ async def play_request(
             requester_id=requester_id,
             requester_name=requester_name,
             force=force,
+            download=download,
         )
     except NoResult:
         await message.reply_text(s("err_no_result"))

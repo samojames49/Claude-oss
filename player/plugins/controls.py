@@ -10,6 +10,7 @@ from ..core.errors import UserError
 from ..core.filters import argument, command
 from ..core.queues import queues
 from ..core.service import player
+from ..core.targets import playback_chat
 from ..utils.formatters import seconds_to_time, time_to_seconds, to_latin_digits
 from ..utils.keyboards import player_panel, queue_panel
 
@@ -20,7 +21,7 @@ DEFAULT_LOOP_ROUNDS = 5
 @Client.on_message(command(["pause"], bare=["توقف", "پاز"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def pause_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     if queues.is_paused(chat_id):
         await message.reply_text(s("already_paused"))
         return
@@ -32,7 +33,7 @@ async def pause_command(_client: Client, message, s):
 @Client.on_message(command(["resume", "continue"], bare=["ادامه", "ریزوم"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def resume_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     if not queues.is_paused(chat_id):
         await message.reply_text(s("already_playing"))
         return
@@ -44,7 +45,7 @@ async def resume_command(_client: Client, message, s):
 @Client.on_message(command(["skip", "next"], bare=["بعدی", "رد"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def skip_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     raw = to_latin_digits(argument(message))
     if raw.isdigit():
         removed = queues.remove(chat_id, int(raw))
@@ -65,13 +66,13 @@ async def skip_command(_client: Client, message, s):
 @player_handler(admin_only=True, require_active=True)
 async def end_command(_client: Client, message, s):
     user = message.from_user
-    await player.stop(message.chat.id, user.mention if user else "")
+    await player.stop(playback_chat(message.chat.id), user.mention if user else "")
 
 
 @Client.on_message(command(["mute"], bare=["بی صدا", "بیصدا"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def mute_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     await calls_service.mute(chat_id)
     queues.set_muted(chat_id, True)
     await message.reply_text(s("muted"))
@@ -80,7 +81,7 @@ async def mute_command(_client: Client, message, s):
 @Client.on_message(command(["unmute"], bare=["با صدا", "باصدا"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def unmute_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     await calls_service.unmute(chat_id)
     queues.set_muted(chat_id, False)
     await message.reply_text(s("unmuted"))
@@ -89,7 +90,7 @@ async def unmute_command(_client: Client, message, s):
 @Client.on_message(command(["volume", "vol"], bare=["صدا"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def volume_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     raw = to_latin_digits(argument(message))
     if not raw.isdigit():
         await message.reply_text(s("volume_range"))
@@ -116,7 +117,7 @@ async def seekback_command(_client: Client, message, s):
 
 
 async def _seek(message, s, *, forward: bool) -> None:
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     offset = time_to_seconds(argument(message))
     if offset <= 0:
         await message.reply_text(s("err_invalid_number"))
@@ -127,10 +128,48 @@ async def _seek(message, s, *, forward: bool) -> None:
     await message.reply_text(s("seeked", position=seconds_to_time(position)))
 
 
+@Client.on_message(
+    command(["timeplay", "goto", "jump"], bare=["زمان پخش", "time play"]) & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True, require_active=True)
+async def time_play_command(_client: Client, message, s):
+    """پرش به یک زمان مشخص: `زمان پخش 45`، `زمان پخش 03:20`، `زمان پخش 01:02:03`."""
+    chat_id = playback_chat(message.chat.id)
+    raw = argument(message).strip()
+    if not raw:
+        await message.reply_text(s("timeplay_usage"))
+        return
+    position = time_to_seconds(raw)
+    if position < 0:
+        await message.reply_text(s("timeplay_usage"))
+        return
+    await player.seek(chat_id, position)
+    await message.reply_text(s("seeked", position=seconds_to_time(position)))
+
+
+@Client.on_message(
+    command(["mediavolume", "mvolume"], bare=["صدا رسانه", "صدای رسانه", "media volume"])
+    & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True)
+async def media_volume_command(_client: Client, message, s):
+    """صدای رسانه (۱ تا ۲۰۰) که در ضبط ویس‌چت هم اثر دارد."""
+    chat_id = playback_chat(message.chat.id)
+    raw = to_latin_digits(argument(message))
+    if not raw.isdigit() or not 1 <= int(raw) <= 200:
+        await message.reply_text(s("volume_range"))
+        return
+    volume = int(raw)
+    await player.set_media_volume(chat_id, volume)
+    await message.reply_text(s("media_volume_set", volume=volume))
+
+
 @Client.on_message(command(["loop", "repeat"], bare=["تکرار"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def loop_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     raw = to_latin_digits(argument(message)).lower()
     if raw in ("off", "0", "خاموش", "قطع"):
         queues.set_loop(chat_id, 0)
@@ -154,7 +193,7 @@ async def loop_command(_client: Client, message, s):
 @Client.on_message(command(["shuffle"], bare=["بر زدن", "شافل"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def shuffle_command(_client: Client, message, s):
-    chat_id = message.chat.id
+    chat_id = playback_chat(message.chat.id)
     count = queues.shuffle(chat_id)
     if count < 2:
         await message.reply_text(s("queue_empty"))
@@ -174,14 +213,14 @@ async def speed_command(_client: Client, message, s):
     if not 0.5 <= speed <= 2.0:
         await message.reply_text(s("speed_range"))
         return
-    await player.set_speed(message.chat.id, speed)
+    await player.set_speed(playback_chat(message.chat.id), speed)
     await message.reply_text(s("speed_set", speed=speed))
 
 
 @Client.on_message(command(["replay", "restart"], bare=["از اول"]) & filters.group, group=1)
 @player_handler(admin_only=True, require_active=True)
 async def replay_command(_client: Client, message, s):
-    await player.replay(message.chat.id)
+    await player.replay(playback_chat(message.chat.id))
     await message.reply_text(s("seeked", position=seconds_to_time(0)))
 
 
@@ -190,7 +229,7 @@ async def replay_command(_client: Client, message, s):
 @callback_handler(admin_only=True, require_active=True)
 async def control_callback(_client: Client, query, s):
     action = query.data.split(":", 1)[1]
-    chat_id = query.message.chat.id
+    chat_id = playback_chat(query.message.chat.id)
 
     if action == "pause":
         await calls_service.pause(chat_id)
@@ -262,7 +301,7 @@ def _panel_markup(chat_id: int, s):
 
 
 async def _refresh_panel(query, s) -> None:
-    chat_id = query.message.chat.id
+    chat_id = playback_chat(query.message.chat.id)
     try:
         await query.message.edit_reply_markup(reply_markup=_panel_markup(chat_id, s))
     except Exception:  # noqa: BLE001

@@ -15,6 +15,7 @@ from .db import db
 from .errors import UserError
 from .lang import strings_for
 from .queues import queues
+from .targets import playback_chat
 
 LOGGER = get_logger("handlers")
 
@@ -86,7 +87,7 @@ def player_handler(
                 if play_permission and chat_id and user and not await can_play(chat_id, user.id):
                     await message.reply_text(s("err_play_mode_admins"))
                     return
-                if require_active and chat_id and not queues.is_active(chat_id):
+                if require_active and chat_id and not queues.is_active(playback_chat(chat_id)):
                     await message.reply_text(s("err_no_active"))
                     return
 
@@ -124,7 +125,7 @@ def callback_handler(*, admin_only: bool = False, require_active: bool = False):
                 if admin_only and chat_id and user and not await can_control(chat_id, user.id):
                     await query.answer(s("callback_admin_only"), show_alert=True)
                     return
-                if require_active and chat_id and not queues.is_active(chat_id):
+                if require_active and chat_id and not queues.is_active(playback_chat(chat_id)):
                     await query.answer(s("callback_no_active"), show_alert=True)
                     return
                 await func(client, query, s)

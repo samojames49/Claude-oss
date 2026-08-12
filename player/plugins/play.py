@@ -36,9 +36,44 @@ async def vplayforce_command(client: Client, message, s):
     await play_request(client, message, s, query=argument(message), video=True, force=True)
 
 
-@Client.on_message(
-    command(["stream", "radio", "live"], bare=["پخش زنده", "رادیو"]) & filters.group, group=1
-)
+@Client.on_message(command(["stream", "radio"], bare=["رادیو"]) & filters.group, group=1)
 @player_handler(play_permission=True)
 async def stream_command(client: Client, message, s):
     await play_request(client, message, s, query=argument(message), video=False)
+
+
+DOWNLOAD_ALIASES = [
+    "دانلود",
+    "دانلود اینستا",
+    "دانلود اینستاگرام",
+    "دانلود یوتیوب",
+    "دانلود تیک تاک",
+    "دانلود موزیک",
+    "دl",
+]
+
+
+@Client.on_message(
+    command(["dl", "download", "dlinsta", "dlinstagram"], bare=DOWNLOAD_ALIASES) & filters.group,
+    group=1,
+)
+@player_handler(play_permission=True)
+async def download_command(client: Client, message, s):
+    """دریافت محتوای یوتیوب/اینستاگرام/تیک‌تاک و پخش آن در ویس‌چت.
+
+    برخلاف `/play` این دستور همیشه اول فایل را می‌گیرد (پایدارتر برای پلتفرم‌هایی که
+    لینک مستقیم‌شان زودگذر است).
+    """
+    query = argument(message)
+    if not query and not getattr(message, "reply_to_message", None):
+        await message.reply_text(s("download_usage"))
+        return
+    video = _wants_video(query)
+    await play_request(client, message, s, query=query, video=video, download=True)
+
+
+def _wants_video(query: str) -> bool:
+    """لینک‌های ویدیویی (اینستاگرام/تیک‌تاک/شورتز) پیش‌فرض ویدیویی پخش می‌شوند."""
+    lowered = query.lower()
+    markers = ("instagram.com", "tiktok.com", "/shorts/", "pinterest.", "twitter.com", "x.com")
+    return any(marker in lowered for marker in markers)
