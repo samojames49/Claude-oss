@@ -1,6 +1,60 @@
+import re
 import unittest
 
+from pyrogram.handlers import CallbackQueryHandler
 from pyrogram.handlers.handler import Handler
+
+from player.utils import keyboards
+
+
+def _callback_data(markup) -> list[str]:
+    return [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+
+
+def _all_button_data() -> set[str]:
+    """همهٔ callback_data‌هایی که ربات ممکن است در دکمه‌ها بفرستد."""
+    markups = [
+        keyboards.start_panel("fa", "playerbot"),
+        keyboards.help_panel("fa"),
+        keyboards.help_back("fa"),
+        keyboards.player_panel("fa", paused=False, muted=False),
+        keyboards.player_panel("fa", paused=True, muted=True),
+        keyboards.queue_panel("fa"),
+        keyboards.language_panel("fa"),
+        keyboards.close_only("fa"),
+        keyboards.search_results("fa", "tok", 6),
+        keyboards.search_results("fa", "tok", 6, video=True),
+        keyboards.settings_panel(
+            "fa",
+            {
+                "play_mode": "admins",
+                "auto_leave": True,
+                "now_playing_message": False,
+                "language_name": "فارسی",
+            },
+        ),
+    ]
+    data: set[str] = set()
+    for markup in markups:
+        data.update(_callback_data(markup))
+    return data
+
+
+def _regex_patterns(flt, found: list[re.Pattern]) -> list[re.Pattern]:
+    """استخراج الگوهای regex از یک فیلتر (که ممکن است ترکیبی باشد)."""
+    pattern = getattr(flt, "p", None)
+    if isinstance(pattern, re.Pattern):
+        found.append(pattern)
+    for attribute in ("base", "other"):
+        nested = getattr(flt, attribute, None)
+        if nested is not None:
+            _regex_patterns(nested, found)
+    return found
 
 
 class TestPluginLoader(unittest.TestCase):
@@ -25,6 +79,22 @@ class TestPluginLoader(unittest.TestCase):
         for handlers in groups.values():
             for handler in handlers:
                 self.assertIsInstance(handler, Handler)
+
+    def test_every_button_has_a_handler(self):
+        """هیچ دکمه‌ای نباید بی‌پاسخ بماند (دکمهٔ مرده)."""
+        patterns: list[re.Pattern] = []
+        for handlers in self.clients.bot.dispatcher.groups.values():
+            for handler in handlers:
+                if isinstance(handler, CallbackQueryHandler) and handler.filters is not None:
+                    _regex_patterns(handler.filters, patterns)
+        self.assertTrue(patterns, "هیچ هندلر دکمه‌ای پیدا نشد")
+
+        for data in sorted(_all_button_data()):
+            with self.subTest(data=data):
+                self.assertTrue(
+                    any(pattern.search(data) for pattern in patterns),
+                    f"دکمهٔ بدون هندلر: {data}",
+                )
 
     def test_loading_twice_does_not_duplicate(self):
         before = sum(len(h) for h in self.clients.bot.dispatcher.groups.values())

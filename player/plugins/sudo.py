@@ -6,7 +6,7 @@ import asyncio
 import shutil
 from pathlib import Path
 
-from pyrogram import Client, filters
+from pyrogram import Client
 from pyrogram.enums import ParseMode
 from pyrogram.errors import FloodWait
 

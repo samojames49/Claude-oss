@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from time import time
 
-from pyrogram import Client, filters
+from pyrogram import Client
 
 from .. import __version__, config
 from ..core.calls import calls_service
