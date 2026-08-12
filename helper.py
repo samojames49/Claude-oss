@@ -155,6 +155,62 @@ CLOCK_SIMPLE_TEXT = """
 🔹 برای تغییر فونت روی دکمه فونت کلیک کنید
 """
 HELP_TEXTS = {
+    "economy": """
+🪙 <b>اقتصاد و گردونهٔ شانس (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>گردونه</code>
+<code>موجودی</code>
+<code>برترین</code>
+
+<b>کاربرد:</b>
+«گردونه» هر ۲۴ ساعت یک‌بار سکهٔ تصادفی (۱ تا ۱۰۰) می‌دهد.
+«موجودی» موجودی سکهٔ شما را نشان می‌دهد.
+«برترین» جدول ردهٔ کاربران این سرور را بر اساس سکه نشان می‌دهد.
+💡 اقتصاد کاملاً محلی است و روی همین سرور ذخیره می‌شود.
+""",
+    "games": """
+🎮 <b>بازی‌های سکه‌ای (Self Saz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>ماهیگیری</code>
+<code>آشپزی</code>
+<code>کارخونه</code>
+<code>برداشت کارخونه</code>
+<code>حدس تاس &lt;عدد&gt; &lt;شرط&gt;</code>
+
+<b>کاربرد:</b>
+🎣 ماهیگیری: هر ۳ دقیقه یک صید و سکه.
+👨‍🍳 آشپزی: هر ۵ دقیقه یک غذا و سکه.
+🏭 کارخونه: هر دقیقه ۱ سکه تولید می‌کند (سقف ۵۰۰)؛ با «برداشت کارخونه» جمع کن.
+🎲 حدس تاس: روی عددی بین ۱ تا ۶ شرط ببند؛ درست حدس بزنی ۵ برابر می‌بری.
+مثال: <code>حدس تاس 4 50</code>
+""",
+    "downloads": """
+⏬ <b>دانلود تیک‌تاک/ساندکلاود/یوتیوب</b>
+
+<b>دستورات قابل کپی:</b>
+<code>تیک تاک &lt;لینک&gt;</code>
+<code>ساندکلاود &lt;لینک&gt;</code>
+<code>یوتیوب &lt;لینک&gt;</code>
+
+<b>کاربرد:</b>
+ویدیو/صوت را دانلود و در همان چت می‌فرستد.
+⚠️ نیازمند نصب <b>yt-dlp</b> و <b>ffmpeg</b> روی سرور:
+<code>pip install yt-dlp</code>
+""",
+    "voicechat": """
+🎧 <b>ویس‌چت / پخش زنده (آزمایشی)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>پخش &lt;لینک&gt;</code>
+<code>ویس چت خروج</code>
+
+<b>کاربرد:</b>
+در ویس‌چتِ گروهِ فعلی وصل می‌شود و صوت لینک را پخش می‌کند.
+⚠️ نیازمند نصب <b>py-tgcalls</b> و <b>ffmpeg</b>:
+<code>pip install py-tgcalls</code>
+""",
     "eavesdrop": """
 👁 <b>شنود کاربران (Self Saz)</b>
 
@@ -1229,6 +1285,14 @@ def get_main_menu(user_id):
         [
             InlineKeyboardButton("📱 نشست‌ها / گوشی‌ها", callback_data=f"help_sessions_{user_id}_1", style="danger"),
             InlineKeyboardButton("👀 خواندن همه چت‌ها", callback_data=f"help_readall_{user_id}_1", style="primary")
+        ],
+        [
+            InlineKeyboardButton("🪙 اقتصاد و گردونه", callback_data=f"help_economy_{user_id}_1", style="warning"),
+            InlineKeyboardButton("🎮 بازی‌های سکه‌ای", callback_data=f"help_games_{user_id}_1", style="warning")
+        ],
+        [
+            InlineKeyboardButton("⏬ دانلود تیک‌تاک/ساندکلاود", callback_data=f"help_downloads_{user_id}_1", style="primary"),
+            InlineKeyboardButton("🎧 ویس‌چت / پخش", callback_data=f"help_voicechat_{user_id}_1", style="secondary")
         ],
         [
             InlineKeyboardButton("🎉 سرگرمی", callback_data=f"help_fun_{user_id}_1", style="warning"),

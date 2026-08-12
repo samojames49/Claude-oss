@@ -4957,6 +4957,388 @@ async def calc_mode_command(client, message):
                        f"حالا هر عبارت ریاضی که بفرستی، خودکار حل می‌شود.")
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# اقتصاد محلی سبک Self Saz: سکه، گردونهٔ شانس، بازی‌ها و برترین‌ها
+# (کاملاً محلی روی همین سرور؛ بدون نیاز به سرور بیرونی)
+# ════════════════════════════════════════════════════════════════════════════
+
+ECONOMY_FILE = f"economy_{USER_ID}.json" if USER_ID else "economy.json"
+
+
+def _load_economy() -> dict:
+    try:
+        if os.path.exists(ECONOMY_FILE):
+            with open(ECONOMY_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        else:
+            d = {}
+    except Exception:
+        d = {}
+    d.setdefault("coins", 0)
+    d.setdefault("cooldowns", {})
+    d.setdefault("factory", {})
+    d.setdefault("name", "")
+    d.setdefault("user_id", USER_ID or 0)
+    return d
+
+
+def _save_economy(d: dict):
+    try:
+        tmp = f"{ECONOMY_FILE}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, ECONOMY_FILE)
+    except Exception as e:
+        print(f"❌ خطا در ذخیرهٔ اقتصاد: {e}")
+
+
+def _fmt_coins(n) -> str:
+    return f"{int(n):,}"
+
+
+def _human_left(sec) -> str:
+    sec = int(max(0, sec))
+    m, s = divmod(sec, 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h} ساعت و {m} دقیقه"
+    if m:
+        return f"{m} دقیقه و {s} ثانیه"
+    return f"{s} ثانیه"
+
+
+def _cooldown_left(d, key, seconds) -> float:
+    last = d.get("cooldowns", {}).get(key, 0)
+    return seconds - (time.time() - last)
+
+
+async def _touch_name(client, d):
+    try:
+        d["name"] = (await client.get_me()).first_name or d.get("name", "")
+    except Exception:
+        pass
+
+
+_FISH_CATCHES = [
+    ("🐟 ماهی معمولی", 3), ("🐠 ماهی رنگی", 6), ("🐡 ماهی بادکنکی", 10),
+    ("🦐 میگو", 4), ("🦀 خرچنگ", 8), ("🐙 اختاپوس", 15),
+    ("🦑 ماهی مرکب", 12), ("🐢 لاک‌پشت (رها شد)", 0), ("🥾 چکمهٔ کهنه!", 0),
+    ("🐳 نهنگ کوچک", 40), ("🦈 کوسه!", 60),
+]
+_COOK_DISHES = [
+    ("🍕 پیتزا", 12), ("🍔 برگر", 10), ("🍜 نودل", 8), ("🥗 سالاد", 5),
+    ("🍣 سوشی", 18), ("🎂 کیک", 15), ("🔥 غذا سوخت!", 0), ("🍲 آبگوشت", 9),
+]
+
+
+@app.on_message(filters.me & filters.regex(r"^(موجودی|سکه های من|سکه‌های من|کیف پول)$"))
+async def balance_command(client, message):
+    d = _load_economy()
+    await message.edit(
+        f"💰 <b>کیف پول شما</b>\n\n🪙 موجودی: <b>{_fmt_coins(d['coins'])}</b> سکه",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^گردونه$"))
+async def wheel_command(client, message):
+    d = _load_economy()
+    left = _cooldown_left(d, "daily", 86400)
+    if left > 0:
+        return await message.edit(
+            f"🎡 <b>گردونهٔ شانس روزانه</b>\n\n⏳ نوبت بعدی تا <b>{_human_left(left)}</b> دیگر.",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    rewards = [1, 2, 5, 10, 20, 50, 100]
+    weights = [26, 24, 20, 14, 9, 5, 2]
+    prize = random.choices(rewards, weights=weights)[0]
+    d["cooldowns"]["daily"] = time.time()
+    d["coins"] = int(d["coins"]) + prize
+    await _touch_name(client, d)
+    _save_economy(d)
+    await message.edit(
+        f"🎡 <b>گردونهٔ شانس روزانه</b>\n\n🎉 برنده شدی: <b>{prize}</b> سکه 🪙\n"
+        f"💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^(ماهیگیری|ماهی گیری|ماهی)$"))
+async def fishing_command(client, message):
+    d = _load_economy()
+    left = _cooldown_left(d, "fish", 180)
+    if left > 0:
+        return await message.edit(f"🎣 قلاب خیس است! تا <b>{_human_left(left)}</b> دیگر صبر کن.",
+                                  parse_mode=enums.ParseMode.HTML)
+    catch, value = random.choice(_FISH_CATCHES)
+    d["cooldowns"]["fish"] = time.time()
+    d["coins"] = int(d["coins"]) + value
+    await _touch_name(client, d)
+    _save_economy(d)
+    if value == 0:
+        await message.edit(f"🎣 صید کردی: {catch}\nسکه‌ای نصیبت نشد 😅")
+    else:
+        await message.edit(
+            f"🎣 صید کردی: {catch}\n🪙 <b>+{value}</b> سکه | موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+            parse_mode=enums.ParseMode.HTML,
+        )
+
+
+@app.on_message(filters.me & filters.regex(r"^(آشپزی|اشپزی|آشپز)$"))
+async def cooking_command(client, message):
+    d = _load_economy()
+    left = _cooldown_left(d, "cook", 300)
+    if left > 0:
+        return await message.edit(f"👨‍🍳 آشپزخانه مشغول است! تا <b>{_human_left(left)}</b> دیگر صبر کن.",
+                                  parse_mode=enums.ParseMode.HTML)
+    dish, value = random.choice(_COOK_DISHES)
+    d["cooldowns"]["cook"] = time.time()
+    d["coins"] = int(d["coins"]) + value
+    await _touch_name(client, d)
+    _save_economy(d)
+    if value == 0:
+        await message.edit(f"👨‍🍳 پختی: {dish}\nحیف شد، سکه‌ای نگرفتی 😬")
+    else:
+        await message.edit(
+            f"👨‍🍳 پختی: {dish}\n🪙 <b>+{value}</b> سکه | موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+            parse_mode=enums.ParseMode.HTML,
+        )
+
+
+@app.on_message(filters.me & filters.regex(r"^کارخونه$"))
+async def factory_command(client, message):
+    d = _load_economy()
+    fac = d["factory"]
+    now = time.time()
+    if not fac.get("start"):
+        fac["start"] = now
+        _save_economy(d)
+        return await message.edit(
+            "🏭 <b>کارخونه راه‌اندازی شد!</b>\n\n⚙️ هر دقیقه ۱ سکه تولید می‌کند (سقف ۵۰۰).\n"
+            "برای برداشت بنویس: <code>برداشت کارخونه</code>",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    produced = min(int((now - fac["start"]) / 60), 500)
+    await message.edit(
+        f"🏭 <b>کارخونه فعال است</b>\n\n⚙️ تولیدشده: <b>{produced}</b> سکه (سقف ۵۰۰)\n"
+        f"برای برداشت: <code>برداشت کارخونه</code>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^برداشت کارخونه$"))
+async def factory_collect_command(client, message):
+    d = _load_economy()
+    fac = d["factory"]
+    if not fac.get("start"):
+        return await message.edit("🏭 کارخونه هنوز راه‌اندازی نشده. اول <code>کارخونه</code> را بفرست.",
+                                  parse_mode=enums.ParseMode.HTML)
+    produced = min(int((time.time() - fac["start"]) / 60), 500)
+    if produced <= 0:
+        return await message.edit("🏭 هنوز چیزی تولید نشده؛ کمی صبر کن.")
+    d["coins"] = int(d["coins"]) + produced
+    fac["start"] = time.time()
+    await _touch_name(client, d)
+    _save_economy(d)
+    await message.edit(
+        f"🏭 برداشت شد: <b>{produced}</b> سکه 🪙\n💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^(حدس تاس|شرط تاس) ([\d۰-۹]) ([\d۰-۹]+)$"))
+async def dice_bet_command(client, message):
+    d = _load_economy()
+    m = message.matches[0]
+    guess = _to_int(m.group(2))
+    bet = _to_int(m.group(3))
+    if not (1 <= guess <= 6):
+        return await message.edit("🎲 عدد حدس باید بین ۱ تا ۶ باشد.")
+    if bet <= 0 or bet > int(d["coins"]):
+        return await message.edit(f"🎲 مقدار شرط نامعتبر است. موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+                                  parse_mode=enums.ParseMode.HTML)
+    roll = random.randint(1, 6)
+    if roll == guess:
+        win = bet * 5
+        d["coins"] = int(d["coins"]) + win
+        result = f"🎉 بردی! تاس {roll} آمد.\n🪙 <b>+{win}</b> سکه"
+    else:
+        d["coins"] = int(d["coins"]) - bet
+        result = f"😔 باختی! تاس {roll} آمد (حدس تو {guess} بود).\n🪙 <b>-{bet}</b> سکه"
+    await _touch_name(client, d)
+    _save_economy(d)
+    await message.edit(f"🎲 <b>حدس تاس</b>\n\n{result}\n💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
+                       parse_mode=enums.ParseMode.HTML)
+
+
+@app.on_message(filters.me & filters.regex(r"^برترین(?: ها|‌ها)?$"))
+async def leaderboard_command(client, message):
+    import glob as _glob
+    entries = []
+    for fpath in _glob.glob("economy_*.json"):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                dd = json.load(f)
+            entries.append((dd.get("name") or f"کاربر {dd.get('user_id','?')}", int(dd.get("coins", 0))))
+        except Exception:
+            continue
+    if not entries and os.path.exists("economy.json"):
+        try:
+            with open("economy.json", "r", encoding="utf-8") as f:
+                dd = json.load(f)
+            entries.append((dd.get("name") or "شما", int(dd.get("coins", 0))))
+        except Exception:
+            pass
+    entries.sort(key=lambda x: x[1], reverse=True)
+    medals = ["🥇", "🥈", "🥉"]
+    lines = ["🏆 <b>برترین‌ها (بیشترین سکه)</b>\n"]
+    for i, (name, coins) in enumerate(entries[:10]):
+        badge = medals[i] if i < 3 else f"{i+1}."
+        lines.append(f"{badge} {name} — <b>{_fmt_coins(coins)}</b> 🪙")
+    if len(lines) == 1:
+        lines.append("هنوز کسی سکه‌ای جمع نکرده. با «گردونه» شروع کن!")
+    await message.edit("\n".join(lines), parse_mode=enums.ParseMode.HTML)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# دانلود از تیک‌تاک / ساندکلاود / یوتیوب (نیازمند yt-dlp + ffmpeg)
+# ════════════════════════════════════════════════════════════════════════════
+
+async def _download_and_send(client, message, url, audio_only, label):
+    await message.edit(f"⏬ در حال دانلود از <b>{label}</b>...", parse_mode=enums.ParseMode.HTML)
+    try:
+        import yt_dlp  # noqa: F401
+    except ImportError:
+        return await message.edit(
+            "❌ برای این قابلیت باید <b>yt-dlp</b> نصب باشد:\n"
+            "<code>pip install yt-dlp</code>\n"
+            "و همچنین <b>ffmpeg</b> روی سرور نصب باشد.",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    rand = random.randint(1000, 9999999)
+    outtmpl = os.path.join(SAVED_PHOTOS_DIR, f"dl_{rand}.%(ext)s")
+    opts = {"outtmpl": outtmpl, "quiet": True, "no_warnings": True, "noplaylist": True}
+    if audio_only:
+        opts["format"] = "bestaudio/best"
+    else:
+        opts["format"] = "best[ext=mp4]/best"
+
+    def _run():
+        import yt_dlp
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            return ydl.prepare_filename(info), info
+
+    try:
+        path, info = await asyncio.to_thread(_run)
+        if not os.path.exists(path):
+            base = path.rsplit(".", 1)[0]
+            for ext in ("mp4", "mkv", "webm", "m4a", "mp3", "opus", "jpg"):
+                if os.path.exists(f"{base}.{ext}"):
+                    path = f"{base}.{ext}"
+                    break
+        title = (info.get("title") or "").strip()
+        if audio_only:
+            await client.send_audio(message.chat.id, path, caption=f"🎵 {title}"[:1000])
+        else:
+            await client.send_video(message.chat.id, path, caption=f"🎬 {title}"[:1000])
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception as e:
+        await message.edit(f"❌ خطا در دانلود: {e}")
+        return
+    try:
+        os.remove(path)
+    except Exception:
+        pass
+
+
+@app.on_message(filters.me & filters.regex(r"^(?:تیک ?تاک|tiktok) (https?://\S+)$"))
+async def tiktok_download_command(client, message):
+    await _download_and_send(client, message, message.matches[0].group(1), audio_only=False, label="تیک‌تاک")
+
+
+@app.on_message(filters.me & filters.regex(r"^(?:ساندکلاود|ساند کلاود|soundcloud) (https?://\S+)$"))
+async def soundcloud_download_command(client, message):
+    await _download_and_send(client, message, message.matches[0].group(1), audio_only=True, label="ساندکلاود")
+
+
+@app.on_message(filters.me & filters.regex(r"^(?:یوتیوب|یوتوب|youtube) (https?://\S+)$"))
+async def youtube_download_command(client, message):
+    await _download_and_send(client, message, message.matches[0].group(1), audio_only=True, label="یوتیوب")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# ویس‌چت / پخش زنده (آزمایشی — نیازمند py-tgcalls + ffmpeg)
+# ════════════════════════════════════════════════════════════════════════════
+
+_pytgcalls_instance = None
+_pytgcalls_started = False
+
+
+def _get_pytgcalls():
+    global _pytgcalls_instance
+    if _pytgcalls_instance is not None:
+        return _pytgcalls_instance
+    try:
+        from pytgcalls import PyTgCalls
+        _pytgcalls_instance = PyTgCalls(app)
+    except Exception as e:
+        print(f"⚠️ py-tgcalls در دسترس نیست: {e}")
+        _pytgcalls_instance = None
+    return _pytgcalls_instance
+
+
+@app.on_message(filters.me & filters.regex(r"^(?:پخش|پخش زنده) (https?://\S+)$") & filters.group)
+async def vc_play_command(client, message):
+    global _pytgcalls_started
+    url = message.matches[0].group(1)
+    pytg = _get_pytgcalls()
+    if pytg is None:
+        return await message.edit(
+            "❌ برای پخش در ویس‌چت باید <b>py-tgcalls</b> و <b>ffmpeg</b> نصب باشند:\n"
+            "<code>pip install py-tgcalls</code>",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    await message.edit("🎧 در حال آماده‌سازی پخش در ویس‌چت...")
+    try:
+        import yt_dlp
+
+        def _geturl():
+            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True,
+                                   "format": "bestaudio", "noplaylist": True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return info.get("url"), (info.get("title") or "")
+
+        audio_url, title = await asyncio.to_thread(_geturl)
+        from pytgcalls.types import MediaStream
+        if not _pytgcalls_started:
+            await pytg.start()
+            _pytgcalls_started = True
+        await pytg.play(message.chat.id, MediaStream(audio_url))
+        await message.edit(f"🎧 <b>در حال پخش در ویس‌چت</b>\n🎵 {title}", parse_mode=enums.ParseMode.HTML)
+    except Exception as e:
+        await message.edit(f"❌ خطا در پخش ویس‌چت: {e}")
+
+
+@app.on_message(filters.me & filters.regex(r"^(?:ویس چت خروج|قطع پخش|توقف پخش)$") & filters.group)
+async def vc_leave_command(client, message):
+    pytg = _get_pytgcalls()
+    if pytg is None:
+        return await message.edit("❌ py-tgcalls نصب نیست.")
+    try:
+        await pytg.leave_call(message.chat.id)
+        await message.edit("🎧 از ویس‌چت خارج شدم.")
+    except Exception as e:
+        try:
+            await pytg.leave_group_call(message.chat.id)
+            await message.edit("🎧 از ویس‌چت خارج شدم.")
+        except Exception:
+            await message.edit(f"❌ خطا: {e}")
+
+
 # ── آخرین هندلر گروه: فرمت‌کنندهٔ خودکارِ متنِ خروجی ─────────────────────────
 # چون آخرین هندلرِ ثبت‌شده است، فقط پیام‌هایی که هیچ دستوری آن‌ها را نگرفته را
 # پردازش می‌کند و دیگر مانع اجرای دستورها نمی‌شود.
