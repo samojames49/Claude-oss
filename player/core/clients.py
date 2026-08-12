@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import importlib
+import pkgutil
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 from pyrogram import Client
 from pyrogram.enums import ParseMode
+from pyrogram.handlers.handler import Handler
 from pytgcalls import PyTgCalls
 
 from .. import config
@@ -13,16 +17,56 @@ from ..utils.logger import get_logger
 
 LOGGER = get_logger("clients")
 
+# پلاگین‌ها را خودمان بارگذاری می‌کنیم (بارگذار خود Pyrogram به مسیر جاری وابسته است
+# و اگر ربات از پوشهٔ دیگری اجرا شود هیچ هندلری ثبت نمی‌کند).
 bot = Client(
     name="player_bot",
     api_id=config.API_ID or 0,
     api_hash=config.API_HASH or "",
     bot_token=config.BOT_TOKEN or "",
     workdir=str(config.SESSION_DIR),
-    plugins={"root": "player.plugins"},
     parse_mode=ParseMode.MARKDOWN,
     max_concurrent_transmissions=4,
 )
+
+_plugins_loaded = False
+
+
+def load_plugins() -> int:
+    """ثبت همهٔ هندلرهای پوشهٔ plugins روی کلاینت ربات.
+
+    هندلرها مستقیم داخل dispatcher قرار می‌گیرند؛ `add_handler` خود Pyrogram ثبت را به
+    یک تسک آسنکرون می‌سپارد و اگر ربات پیش از اجرای آن تسک آپدیتی بگیرد، دستورها بی‌پاسخ
+    می‌مانند. این تابع باید پیش از `bot.start()` صدا زده شود.
+    """
+    global _plugins_loaded
+
+    from .. import plugins as plugins_package
+
+    if _plugins_loaded:
+        return sum(len(handlers) for handlers in bot.dispatcher.groups.values())
+
+    groups: dict[int, list[Handler]] = {}
+    seen: set[int] = set()
+    for info in sorted(pkgutil.iter_modules(plugins_package.__path__), key=lambda m: m.name):
+        module = importlib.import_module(f"{plugins_package.__name__}.{info.name}")
+        for attribute in vars(module).values():
+            handlers = getattr(attribute, "handlers", None)
+            if not isinstance(handlers, list):
+                continue
+            for handler, group in handlers:
+                if not isinstance(handler, Handler) or not isinstance(group, int):
+                    continue
+                if id(handler) in seen:  # هندلری که از ماژول دیگری هم ایمپورت شده
+                    continue
+                seen.add(id(handler))
+                groups.setdefault(group, []).append(handler)
+
+    for group in sorted(groups):
+        bot.dispatcher.groups.setdefault(group, []).extend(groups[group])
+    bot.dispatcher.groups = OrderedDict(sorted(bot.dispatcher.groups.items()))
+    _plugins_loaded = True
+    return len(seen)
 
 
 @dataclass
@@ -87,6 +131,9 @@ def assistant_by_id(user_id: int) -> Assistant | None:
 
 async def start_clients() -> None:
     """راه‌اندازی ربات و همهٔ اسیستنت‌ها."""
+    handlers = load_plugins()
+    LOGGER.info("%s هندلر از پوشهٔ plugins بارگذاری شد.", handlers)
+
     await bot.start()
     me = await bot.get_me()
     bot.me = me
