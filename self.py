@@ -300,9 +300,8 @@ def get_persian_action_name(english_name):
 def get_english_action_name(persian_name):
     english_map = {
         "تایپ": "typing",
-        "اپلود فایل": "upload_document",
         "اپلود عکس": "upload_photo",
-        "اپلود فایل": "upload_document", 
+        "اپلود فایل": "upload_document",
         "اپلود ویدیو": "upload_video",
         "اپلود ویس": "upload_audio",
         "اپلود ویدیو نوت": "upload_video_note",
@@ -1399,6 +1398,127 @@ async def apply_actions_private(client: Client, message: Message):
 @app.on_message(filters.group & ~filters.me)
 async def apply_actions_group(client: Client, message: Message):
     await apply_chat_actions(client, message)
+
+
+def _media_kind(message):
+    """تشخیص نوع مدیا برای بازفرست از روی file_id."""
+    for attr, kind in (
+        ("photo", "photo"), ("video", "video"), ("voice", "voice"),
+        ("audio", "audio"), ("document", "document"), ("sticker", "sticker"),
+        ("animation", "animation"), ("video_note", "video_note"),
+    ):
+        media = getattr(message, attr, None)
+        if media:
+            return kind, getattr(media, "file_id", None)
+    return None, None
+
+
+def _cache_message(message):
+    """نگه‌داری نسخهٔ سبک پیام‌های دریافتی برای بازیابی حذف/ادیت."""
+    if message.from_user and message.from_user.is_self:
+        return
+    kind, file_id = _media_kind(message)
+    key = f"{message.chat.id}:{message.id}"
+    sender = message.from_user
+    message_cache[key] = {
+        "text": message.text or message.caption or "",
+        "media_kind": kind,
+        "file_id": file_id,
+        "name": (sender.first_name if sender else "") or "",
+        "user_id": sender.id if sender else 0,
+        "chat_id": message.chat.id,
+        "ts": time.time(),
+    }
+    # محدودسازی حجم کش تا حافظه پر نشود
+    if len(message_cache) > MESSAGE_CACHE_LIMIT:
+        for old_key in list(message_cache.keys())[: len(message_cache) - MESSAGE_CACHE_LIMIT]:
+            message_cache.pop(old_key, None)
+
+
+@app.on_message(~filters.me & filters.incoming, group=5)
+async def cache_incoming_messages(client, message):
+    if save_deleted_enabled or save_edited_enabled:
+        _cache_message(message)
+
+
+async def _resend_cached(client, cached, header):
+    """ارسال نسخهٔ کش‌شدهٔ یک پیام به Saved Messages."""
+    text = cached.get("text", "")
+    caption = f"{header}\n\n{text}" if text else header
+    kind = cached.get("media_kind")
+    file_id = cached.get("file_id")
+    try:
+        if kind and file_id:
+            sender = {
+                "photo": client.send_photo,
+                "video": client.send_video,
+                "voice": client.send_voice,
+                "audio": client.send_audio,
+                "document": client.send_document,
+                "animation": client.send_animation,
+                "video_note": client.send_video_note,
+            }.get(kind)
+            if kind == "sticker":
+                await client.send_message("me", header)
+                await client.send_sticker("me", file_id)
+                return
+            if sender is not None:
+                if kind == "video_note":
+                    await client.send_message("me", caption)
+                    await sender("me", file_id)
+                else:
+                    await sender("me", file_id, caption=caption)
+                return
+        await client.send_message("me", caption)
+    except Exception as e:
+        print(f"❌ خطا در بازفرست پیام کش‌شده: {e}")
+
+
+@app.on_deleted_messages()
+async def on_deleted_messages(client, messages):
+    if not save_deleted_enabled:
+        return
+    for message in messages:
+        key = f"{message.chat.id}:{message.id}"
+        cached = message_cache.get(key)
+        if not cached:
+            continue
+        name = cached.get("name", "کاربر")
+        uid = cached.get("user_id", 0)
+        header = (
+            f"🗑 <b>پیام حذف‌شده</b>\n"
+            f"👤 {name} (<code>{uid}</code>)\n"
+            f"💬 چت: <code>{cached.get('chat_id')}</code>"
+        )
+        await _resend_cached(client, cached, header)
+        message_cache.pop(key, None)
+
+
+@app.on_edited_message(~filters.me & filters.incoming, group=6)
+async def on_edited_incoming(client, message):
+    if not save_edited_enabled:
+        # حتی وقتی سیو ادیت خاموش است، برای سیو حذف کش را تازه نگه می‌داریم
+        if save_deleted_enabled:
+            _cache_message(message)
+        return
+    key = f"{message.chat.id}:{message.id}"
+    old = message_cache.get(key)
+    new_text = message.text or message.caption or ""
+    if old is not None:
+        name = old.get("name", "کاربر")
+        uid = old.get("user_id", 0)
+        try:
+            await client.send_message(
+                "me",
+                f"✏️ <b>پیام ویرایش شد</b>\n"
+                f"👤 {name} (<code>{uid}</code>)\n\n"
+                f"🔸 <b>قبل:</b>\n{old.get('text','')}\n\n"
+                f"🔹 <b>بعد:</b>\n{new_text}",
+                parse_mode=enums.ParseMode.HTML,
+            )
+        except Exception as e:
+            print(f"❌ خطا در ارسال گزارش ویرایش: {e}")
+    _cache_message(message)
 @app.on_message(filters.me & filters.regex(r'^پیشی شروع$'))
 async def pishi_start_command(client, message):
     task_id, task = task_manager.get_chat_task(message.chat.id)
@@ -1945,55 +2065,6 @@ async def clear_scheduled_messages(client, message):
         json.dump(scheduled_messages, f, ensure_ascii=False, indent=4)
     
     await message.edit(f"✅ **همه پیام‌های زمان‌دار پاک شدند**\n🗑️ تعداد: {count} پیام")
-@app.on_message(filters.me & filters.regex(r'^لیست زمان‌دار$'))
-async def list_scheduled_messages(client, message):
-    global scheduled_messages
-    
-    if not scheduled_messages:
-        await message.edit("❌ **هیچ پیام زمان‌داری تنظیم نشده**")
-        return
-    
-    list_text = "📋 **لیست پیام‌های زمان‌دار**\n\n"
-    
-    for msg_id, msg_data in scheduled_messages.items():
-        list_text += f"🆔 **کد:** `{msg_id}`\n"
-        list_text += f"⏰ **زمان:** `{msg_data['time']}`\n"
-        list_text += f"📝 **متن:** {msg_data['text'][:30]}{'...' if len(msg_data['text']) > 30 else ''}\n"
-        list_text += "─" * 30 + "\n"
-    
-    await message.edit(list_text)
-
-@app.on_message(filters.me & filters.regex(r'^حذف زمان‌دار (.+)$'))
-async def remove_scheduled_message(client, message):
-    global scheduled_messages
-    
-    msg_id = message.matches[0].group(1)
-    
-    if msg_id in scheduled_messages:
-        del scheduled_messages[msg_id]
-        
-        with open("scheduled_messages.json", "w", encoding="utf-8") as f:
-            json.dump(scheduled_messages, f, ensure_ascii=False, indent=4)
-        
-        await message.edit(f"✅ **پیام زمان‌دار حذف شد**\n🆔 کد: `{msg_id}`")
-    else:
-        await message.edit(f"❌ **پیام زمان‌دار با کد `{msg_id}` یافت نشد**")
-
-@app.on_message(filters.me & filters.regex(r'^پاکسازی زمان‌دار$'))
-async def clear_scheduled_messages(client, message):
-    global scheduled_messages
-    
-    if not scheduled_messages:
-        await message.edit("❌ **هیچ پیام زمان‌داری برای پاکسازی وجود ندارد**")
-        return
-    
-    count = len(scheduled_messages)
-    scheduled_messages.clear()
-    
-    with open("scheduled_messages.json", "w", encoding="utf-8") as f:
-        json.dump(scheduled_messages, f, ensure_ascii=False, indent=4)
-    
-    await message.edit(f"✅ **همه پیام‌های زمان‌دار پاک شدند**\n🗑️ تعداد: {count} پیام")
 @app.on_message(filters.me & filters.regex(r'^بن$') & filters.group)
 async def ban_user(client, message):
     if not message.reply_to_message:
@@ -2276,7 +2347,7 @@ async def members_count(client, message):
     except Exception as e:
         await message.edit(f"❌ **خطا:** `{str(e)}`")
 
-@app.on_message(filters.me & filters.regex(r'^اهسته خاموش$') & filters.group)
+@app.on_message(filters.me & filters.regex(r'^اهسته روشن$') & filters.group)
 async def slowmode_on(client, message):
     try:
         await client.set_slow_mode(chat_id=message.chat.id, seconds=60)
@@ -2395,6 +2466,246 @@ async def time_command(client: Client, message: Message):
             await message.edit("✅ تایم کنار نام غیرفعال شد")
     else:
         await message.edit("⚠️ **استفاده:**\n`تایم روشن` - فعال کردن\n`تایم خاموش` - غیرفعال کردن")
+
+@app.on_message(filters.me & filters.regex(r"^بیو تایم (روشن|خاموش)$"))
+async def bio_time_command(client: Client, message: Message):
+    """نمایش ساعت در بایو (علاوه بر اسم) — قابلیت سبک Self VTR."""
+    global bio_time_enabled, original_bio
+    action = message.matches[0].group(1)
+    if action == "روشن":
+        bio_time_enabled = True
+        ensure_time_updater(client)
+        await update_bio_with_time(client)
+        save_state()
+        await message.edit("✅ **ساعت در بایو فعال شد**\nبایوی شما هر دقیقه به‌روزرسانی می‌شود.")
+    else:
+        bio_time_enabled = False
+        try:
+            if original_bio is not None:
+                await client.update_profile(bio=original_bio)
+            original_bio = None
+        except Exception:
+            pass
+        save_state()
+        await message.edit("❌ **ساعت در بایو غیرفعال شد**\nبایو به حالت قبل بازگشت.")
+
+
+@app.on_message(filters.me & filters.regex(r"^سیو حذفیات (روشن|خاموش)$"))
+async def save_deleted_command(client: Client, message: Message):
+    global save_deleted_enabled
+    save_deleted_enabled = message.matches[0].group(1) == "روشن"
+    save_state()
+    state = "فعال" if save_deleted_enabled else "غیرفعال"
+    await message.edit(
+        f"🗑 **ذخیرهٔ پیام‌های حذف‌شده {state} شد**\n\n"
+        "پس از این، هر پیامی که طرف مقابل حذف کند به Saved Messages شما فرستاده می‌شود."
+        if save_deleted_enabled else
+        f"🗑 **ذخیرهٔ پیام‌های حذف‌شده {state} شد**"
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^سیو ادیت (روشن|خاموش)$"))
+async def save_edited_command(client: Client, message: Message):
+    global save_edited_enabled
+    save_edited_enabled = message.matches[0].group(1) == "روشن"
+    save_state()
+    state = "فعال" if save_edited_enabled else "غیرفعال"
+    await message.edit(
+        f"✏️ **ذخیرهٔ پیام‌های ویرایش‌شده {state} شد**\n\n"
+        "پس از این، هر ویرایش پیام (متن قبل و بعد) به Saved Messages شما فرستاده می‌شود."
+        if save_edited_enabled else
+        f"✏️ **ذخیرهٔ پیام‌های ویرایش‌شده {state} شد**"
+    )
+
+
+async def _user_snapshot(client, user_id):
+    try:
+        chat = await client.get_chat(user_id)
+    except Exception:
+        return None
+    return {
+        "first_name": chat.first_name or "",
+        "last_name": getattr(chat, "last_name", "") or "",
+        "username": chat.username or "",
+        "bio": getattr(chat, "bio", "") or "",
+        "photo_id": getattr(getattr(chat, "photo", None), "big_file_id", None),
+    }
+
+
+@app.on_message(filters.me & filters.regex(r"^رصد$") & filters.reply)
+async def watch_user_command(client: Client, message: Message):
+    """شروع رصد تغییرات پروفایل یک کاربر (اسم/یوزرنیم/بایو/عکس)."""
+    global watch_task_started
+    target = message.reply_to_message.from_user
+    if not target:
+        await message.edit("❌ روی پیام کاربر ریپلای کنید.")
+        return
+    snapshot = await _user_snapshot(client, target.id)
+    if snapshot is None:
+        await message.edit("❌ دریافت اطلاعات کاربر ممکن نشد.")
+        return
+    watched_users[str(target.id)] = snapshot
+    save_state()
+    if not watch_task_started:
+        watch_task_started = True
+        asyncio.create_task(watch_profiles_loop(client))
+    await message.edit(
+        f"👁 **رصد فعال شد**\n👤 {target.first_name or ''} (<code>{target.id}</code>)\n\n"
+        "هر تغییری در اسم، یوزرنیم، بایو یا عکس پروفایل این کاربر به شما اطلاع داده می‌شود.",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^حذف رصد$") & filters.reply)
+async def unwatch_user_command(client: Client, message: Message):
+    target = message.reply_to_message.from_user
+    if target and str(target.id) in watched_users:
+        del watched_users[str(target.id)]
+        save_state()
+        await message.edit(f"✅ رصد کاربر {target.first_name or target.id} متوقف شد.")
+    else:
+        await message.edit("ℹ️ این کاربر تحت رصد نیست.")
+
+
+@app.on_message(filters.me & filters.regex(r"^لیست رصد$"))
+async def watch_list_command(client: Client, message: Message):
+    if not watched_users:
+        await message.edit("📭 هیچ کاربری تحت رصد نیست.")
+        return
+    lines = ["👁 **کاربران تحت رصد:**\n"]
+    for uid, snap in watched_users.items():
+        lines.append(f"• {snap.get('first_name','')} (<code>{uid}</code>)")
+    await message.edit("\n".join(lines), parse_mode=enums.ParseMode.HTML)
+
+
+async def watch_profiles_loop(client):
+    """هر ۶۰ ثانیه پروفایل کاربران تحت رصد را با نسخهٔ قبلی مقایسه می‌کند."""
+    global watch_task_started
+    try:
+        while watched_users:
+            await asyncio.sleep(60)
+            for uid in list(watched_users.keys()):
+                current = await _user_snapshot(client, int(uid))
+                if current is None:
+                    continue
+                old = watched_users.get(uid, {})
+                changes = []
+                labels = {
+                    "first_name": "نام", "last_name": "نام خانوادگی",
+                    "username": "یوزرنیم", "bio": "بایو", "photo_id": "عکس پروفایل",
+                }
+                for field, label in labels.items():
+                    if old.get(field) != current.get(field):
+                        if field == "photo_id":
+                            changes.append(f"🖼 {label} تغییر کرد")
+                        else:
+                            changes.append(
+                                f"🔸 {label}: «{old.get(field,'')}» ← «{current.get(field,'')}»"
+                            )
+                if changes:
+                    watched_users[uid] = current
+                    save_state()
+                    try:
+                        await client.send_message(
+                            "me",
+                            f"👁 <b>تغییر پروفایل</b> (<code>{uid}</code>)\n\n" + "\n".join(changes),
+                            parse_mode=enums.ParseMode.HTML,
+                        )
+                    except Exception as e:
+                        print(f"❌ خطا در گزارش رصد: {e}")
+    finally:
+        watch_task_started = False
+
+
+@app.on_message(filters.me & filters.regex(r"^ست پروفایل (.+)$", flags=re.DOTALL))
+async def set_auto_profile_names(client: Client, message: Message):
+    """تعیین اسم‌هایی که به‌صورت چرخشی روی پروفایل ست می‌شوند (با | جدا شوند)."""
+    global auto_profile_names
+    raw = message.matches[0].group(1)
+    names = [n.strip() for n in raw.split("|") if n.strip()]
+    if not names:
+        await message.edit("❌ حداقل یک اسم وارد کنید. مثال: `ست پروفایل اسم۱ | اسم۲ | اسم۳`")
+        return
+    auto_profile_names = names
+    save_state()
+    await message.edit(
+        f"✅ **{len(names)} اسم برای پروفایل خودکار ذخیره شد**\n\n"
+        "برای شروع: `پروفایل خودکار روشن`"
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^پروفایل خودکار (روشن|خاموش)$"))
+async def auto_profile_command(client: Client, message: Message):
+    global auto_profile_enabled, auto_profile_task
+    action = message.matches[0].group(1)
+    if action == "روشن":
+        if not auto_profile_names:
+            await message.edit("❌ ابتدا با `ست پروفایل ...` اسم‌ها را تعیین کنید.")
+            return
+        already = auto_profile_enabled and auto_profile_task is not None and not auto_profile_task.done()
+        auto_profile_enabled = True
+        if not already:
+            auto_profile_task = asyncio.create_task(auto_profile_loop(client))
+        save_state()
+        await message.edit(
+            f"✅ **پروفایل خودکار فعال شد**\n"
+            f"🔁 هر {auto_profile_interval} ثانیه اسم بعدی ست می‌شود."
+        )
+    else:
+        auto_profile_enabled = False
+        if auto_profile_task is not None:
+            auto_profile_task.cancel()
+            auto_profile_task = None
+        save_state()
+        await message.edit("❌ **پروفایل خودکار غیرفعال شد**")
+
+
+async def auto_profile_loop(client):
+    """چرخش اسم پروفایل بین اسم‌های تعیین‌شده."""
+    index = 0
+    try:
+        while auto_profile_enabled and auto_profile_names:
+            name = auto_profile_names[index % len(auto_profile_names)]
+            index += 1
+            try:
+                await client.update_profile(first_name=name)
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+            except Exception as e:
+                print(f"❌ خطا در پروفایل خودکار: {e}")
+            await asyncio.sleep(max(30, auto_profile_interval))
+    except asyncio.CancelledError:
+        pass
+
+
+@app.on_message(filters.me & filters.regex(r"^(انقضا|expiry)$"))
+async def expiry_command(client: Client, message: Message):
+    """نمایش زمان باقی‌مانده/انقضای سلف بر اساس سکه‌های موجود در پایگاه‌دادهٔ ربات."""
+    hours = None
+    try:
+        if USER_ID and os.path.exists(config.DATABASE_FILE):
+            with open(config.DATABASE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            hours = int(data.get("credits", {}).get(str(USER_ID), 0) or 0)
+    except Exception:
+        hours = None
+
+    if hours is None:
+        await message.edit("ℹ️ اطلاعات انقضا در دسترس نیست.")
+        return
+
+    if hours <= 0:
+        await message.edit("⌛️ **اعتبار سلف شما به پایان رسیده است.**")
+        return
+
+    expire_at = get_iran_now() + timedelta(hours=hours)
+    await message.edit(
+        f"⏳ **زمان باقی‌مانده سلف**\n\n"
+        f"💰 اعتبار: <code>{hours}</code> ساعت\n"
+        f"📅 انقضا: <code>{expire_at.strftime('%Y-%m-%d %H:%M')}</code>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
 
 @app.on_message(filters.me & filters.command("لیست فونت", prefixes=""))
 async def font_list_command(client: Client, message: Message):
@@ -2741,14 +3052,16 @@ async def advanced_id_command(client: Client, message: Message):
         if message.reply_to_message:
             replied_user = message.reply_to_message.from_user
             replied_chat = message.chat
-            
+            # باگ قبلی: یوزرنیم خودِ فرستنده نمایش داده می‌شد، نه کاربر ریپلای‌شده
+            replied_username_id = f"@{replied_user.username}" if replied_user.username else "<i>ندارد</i>"
+
             common_chats = await client.get_common_chats(replied_user.id)
             
             user_info = f"""
 <b>• اطلاعات کاربر</b>
 
 <b>آیدی عددی:</b> <code>{replied_user.id}</code>
-<b>یوزرنیم:</b> <code>{username_id}</code>
+<b>یوزرنیم:</b> <code>{replied_username_id}</code>
 <b>نام:</b> {replied_user.first_name or '<i>ندارد</i>'}
 <b>نام خانوادگی:</b> {replied_user.last_name or '<i>ندارد</i>'}
 <b>پریمیوم:</b> {"<b>فعال</b>" if replied_user.is_premium else "<i>غیرفعال</i>"}
@@ -4052,13 +4365,61 @@ async def execute_command_from_helper(command, user_id):
 command_checker_thread = threading.Thread(target=check_commands_from_helper, daemon=True)
 command_checker_thread.start()
 
-if __name__ == "__main__":
+
+async def restore_background_tasks():
+    """پس از ری‌استارت سلف، حالت‌های ذخیره‌شده دوباره اجرا می‌شوند."""
+    global online_task, auto_profile_task, watch_task_started
+    me = await app.get_me()
+    my_id = me.id
+    user_original_names.setdefault(my_id, me.first_name or "")
+
+    if always_online_enabled:
+        online_task = asyncio.create_task(keep_online(app))
+
+    if bio_time_enabled:
+        ensure_time_updater(app)
+
+    if auto_profile_enabled and auto_profile_names:
+        auto_profile_task = asyncio.create_task(auto_profile_loop(app))
+
+    if watched_users and not watch_task_started:
+        watch_task_started = True
+        asyncio.create_task(watch_profiles_loop(app))
+
+
+async def autosave_state_loop():
+    """ذخیرهٔ دوره‌ای وضعیت تا تغییرات دستورات مستقیم (قفل/اکشن/پاسخ) هم بماند."""
+    while True:
+        await asyncio.sleep(30)
+        try:
+            save_state()
+        except Exception as e:
+            print(f"⚠️ autosave ناموفق: {e}")
+
+
+async def selfbot_main():
+    load_state()
+    await app.start()
     if USER_ID:
         print(f"✅ سلف‌بات برای کاربر {USER_ID} در حال اجرا...")
         print(f"📱 شماره: {PHONE}")
     else:
         print("⚠️ سلف‌بات در حالت معمولی اجرا شد")
-    
+
     threading.Thread(target=start_pishi_system, daemon=True).start()
-    
-    app.run()
+
+    try:
+        await restore_background_tasks()
+    except Exception as e:
+        print(f"⚠️ بازیابی تسک‌های پس‌زمینه ناقص بود: {e}")
+
+    asyncio.create_task(autosave_state_loop())
+
+    from pyrogram import idle
+    await idle()
+    save_state()
+    await app.stop()
+
+
+if __name__ == "__main__":
+    app.run(selfbot_main())
