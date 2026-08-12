@@ -258,6 +258,59 @@ STRINGS = {
     "maintenance_off": "✅ Maintenance mode disabled.",
     "cleanup_done": "🧹 Cleanup done: {count} files ({size}) removed.",
     "logs_missing": "Log file not found.",
+    # ── subtitles ────────────────────────────────────────────────────────────
+    "subtitle_usage": (
+        "Reply to a subtitle file (`srt`, `vtt`, `ass`) with `/subtitle`.\n"
+        "To remove it: `/subtitle off`"
+    ),
+    "subtitle_applied": "📝 Subtitles burned onto **{title}**; playback resumed at the same spot.",
+    "subtitle_removed": "📝 Subtitles removed.",
+    "subtitle_audio_only": "⚠️ Subtitles only make sense for video playback.",
+    "subtitle_disabled": "The subtitle feature is disabled.",
+    "err_subtitle_audio": "⚠️ Subtitles only make sense for video playback.",
+    # ── player panel ─────────────────────────────────────────────────────────
+    "panel_home": (
+        "🎛 **Player panel — {chat}**\n\n"
+        "▫️ Play permission: **{play_mode}**\n"
+        "▫️ Call stats: **{stats}**\n"
+        "▫️ Call security: **{security}**\n"
+        "▫️ Player channel: **{channel}**\n\n"
+        "Pick a section:"
+    ),
+    "panel_section_header": "🎛 **{section}** — {chat}\n\nTap a button to change its value:",
+    "panel_section_play": "🎚 Playback",
+    "panel_section_stats": "🎙 Call stats",
+    "panel_section_security": "🛡 Call security",
+    "panel_section_look": "🪴 Look & messages",
+    "panel_btn_play_mode": "🎚 Play permission: {value}",
+    "panel_btn_auto_leave": "🚪 Auto leave: {value}",
+    "panel_btn_now_playing_message": "📢 Now playing message: {value}",
+    "panel_btn_play_in_channel": "☕️ Play in channel: {value}",
+    "panel_btn_call_stats": "🎙 Record call stats: {value}",
+    "panel_btn_call_stats_auto": "📨 Auto post stats: {value}",
+    "panel_btn_call_stats_reset": "🔄 Stats reset: {value}",
+    "panel_btn_call_security": "🛡 Call security: {value}",
+    "panel_btn_security_mute_on_join": "🎤 Mute on join: {value}",
+    "panel_btn_security_report": "👏 Send reports: {value}",
+    "panel_btn_security_summary": "🤡 Call summary: {value}",
+    "panel_btn_security_owners_access": "😴 Owners access: {value}",
+    "panel_btn_security_min_age_days": "🥶 Membership age: {value}",
+    "panel_btn_classic_mode": "🪴 Classic mode: {value}",
+    "panel_btn_auto_clear": "🧹 Auto clear: {value}",
+    "panel_btn_language": "🌐 Language: {value}",
+    "panel_reset_off": "off",
+    "panel_reset_daily": "daily",
+    "panel_reset_monthly": "monthly",
+    "panel_days": "{days} days",
+    "panel_age_0": "no limit",
+    "panel_age_3": "3 days",
+    "panel_age_7": "7 days",
+    "panel_age_14": "14 days",
+    "panel_no_channel": "none",
+    "panel_owner_only": "This section is owner-only (owners access is off).",
+    "panel_expired": "This panel expired; send the panel command again.",
+    "menupv_sent": "📬 Settings panel sent to your private chat.",
+    "menupv_failed": "❌ Could not message you; start the bot in private first.",
     # ── voice chat management ────────────────────────────────────────────────
     "call_title_usage": "Write the title after the command:\n`/setcalltitle Movie night`",
     "call_title_set": "✏️ Voice chat title set to **{title}**.",
@@ -343,6 +396,10 @@ STRINGS = {
     "security_off": "🛡 Call security disabled.",
     "security_age_set": "🥶 Required membership age set to **{days} days**.",
     "security_age_prompt": "Send the number of days (example: `Account age 7`).",
+    "mute_join_on": "🎤 Mute on join enabled; newcomers must request to speak.",
+    "mute_join_off": "🎤 Mute on join disabled.",
+    "call_message_on": "💬 Voice chat service messages are kept in the group.",
+    "call_message_off": "💬 Voice chat service messages will be deleted.",
     # ── logging ──────────────────────────────────────────────────────────────
     "log_new_chat": "🆕 **New chat**\nTitle: {title}\nID: `{chat_id}`\nAdded by: {user}",
     "log_left_chat": "👋 **Left chat**\nTitle: {title}\nID: `{chat_id}`",

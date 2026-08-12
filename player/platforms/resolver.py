@@ -36,10 +36,16 @@ async def _attach_source(
 ) -> Track:
     """آماده‌سازی مسیر پخش: لینک مستقیم یا فایل دانلودشده."""
     if force_download or config.STREAM_MODE == "download":
-        path = await youtube.download(target, video=video)
+        # برای ویدیو، اگر زیرنویس در دسترس باشد همان لحظه گرفته و روی تصویر چسبانده می‌شود
+        subtitle_lang = config.SUBTITLE_LANG if (video and config.SUBTITLE_ENABLED) else None
+        path, subtitle = await youtube.download_media(
+            target, video=video, subtitle_lang=subtitle_lang
+        )
         if path:
             track.source = path
             track.file_path = path
+            if subtitle:
+                track.subtitle_path = subtitle
             return track
         LOGGER.warning("دانلود ناموفق بود؛ به پخش لینک مستقیم برمی‌گردیم: %s", target)
 

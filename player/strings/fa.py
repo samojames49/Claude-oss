@@ -263,6 +263,59 @@ STRINGS = {
     "maintenance_off": "✅ حالت تعمیرات خاموش شد.",
     "cleanup_done": "🧹 پاک‌سازی انجام شد: {count} فایل ({size}) حذف شد.",
     "logs_missing": "فایل لاگ موجود نیست.",
+    # ── زیرنویس ──────────────────────────────────────────────────────────────
+    "subtitle_usage": (
+        "روی فایل زیرنویس (`srt`, `vtt`, `ass`) ریپلای کنید و بنویسید «زیرنویس».\n"
+        "برای برداشتن زیرنویس: `زیرنویس حذف`"
+    ),
+    "subtitle_applied": "📝 زیرنویس روی **{title}** چسبانده شد و پخش از همان لحظه ادامه یافت.",
+    "subtitle_removed": "📝 زیرنویس برداشته شد.",
+    "subtitle_audio_only": "⚠️ زیرنویس فقط روی پخش ویدیویی معنا دارد.",
+    "subtitle_disabled": "قابلیت زیرنویس خاموش است.",
+    "err_subtitle_audio": "⚠️ زیرنویس فقط روی پخش ویدیویی معنا دارد.",
+    # ── پنل پلیر ─────────────────────────────────────────────────────────────
+    "panel_home": (
+        "🎛 **پنل پلیر — {chat}**\n\n"
+        "▫️ اجازهٔ پخش: **{play_mode}**\n"
+        "▫️ آمار کال: **{stats}**\n"
+        "▫️ امنیت کال: **{security}**\n"
+        "▫️ کانال پلیر: **{channel}**\n\n"
+        "یک بخش را انتخاب کنید:"
+    ),
+    "panel_section_header": "🎛 **{section}** — {chat}\n\nروی هر دکمه بزنید تا مقدارش عوض شود:",
+    "panel_section_play": "🎚 پخش",
+    "panel_section_stats": "🎙 آمار کال",
+    "panel_section_security": "🛡 امنیت کال",
+    "panel_section_look": "🪴 ظاهر و پیام‌ها",
+    "panel_btn_play_mode": "🎚 اجازهٔ پخش: {value}",
+    "panel_btn_auto_leave": "🚪 خروج خودکار: {value}",
+    "panel_btn_now_playing_message": "📢 پیام پخش: {value}",
+    "panel_btn_play_in_channel": "☕️ پخش در کانال: {value}",
+    "panel_btn_call_stats": "🎙 ثبت آمار کال: {value}",
+    "panel_btn_call_stats_auto": "📨 ارسال خودکار آمار: {value}",
+    "panel_btn_call_stats_reset": "🔄 ریست آمار: {value}",
+    "panel_btn_call_security": "🛡 امنیت کال: {value}",
+    "panel_btn_security_mute_on_join": "🎤 میوت ورودی کال: {value}",
+    "panel_btn_security_report": "👏 ارسال گزارش: {value}",
+    "panel_btn_security_summary": "🤡 خلاصهٔ ویس‌چت: {value}",
+    "panel_btn_security_owners_access": "😴 دسترسی مالکان: {value}",
+    "panel_btn_security_min_age_days": "🥶 قدمت اکانت: {value}",
+    "panel_btn_classic_mode": "🪴 حالت کلاسیک: {value}",
+    "panel_btn_auto_clear": "🧹 پاک‌سازی خودکار: {value}",
+    "panel_btn_language": "🌐 زبان: {value}",
+    "panel_reset_off": "خاموش",
+    "panel_reset_daily": "روزانه",
+    "panel_reset_monthly": "ماهیانه",
+    "panel_days": "{days} روز",
+    "panel_age_0": "بدون محدودیت",
+    "panel_age_3": "۳ روز",
+    "panel_age_7": "۷ روز",
+    "panel_age_14": "۱۴ روز",
+    "panel_no_channel": "ندارد",
+    "panel_owner_only": "این بخش فقط برای مالک گروه است (دسترسی مالکان خاموش است).",
+    "panel_expired": "این پنل منقضی شده؛ دوباره دستور «پنل پلیر» را بزنید.",
+    "menupv_sent": "📬 پنل تنظیمات در چت خصوصی برایتان فرستاده شد.",
+    "menupv_failed": "❌ نتوانستم پیام بفرستم؛ اول ربات را در پیوی استارت کنید.",
     # ── مدیریت ویس‌چت ────────────────────────────────────────────────────────
     "call_title_usage": "عنوان دلخواه را بعد از دستور بنویسید:\n`تنظیم عنوان کال شب‌نشینی`",
     "call_title_set": "✏️ عنوان ویس‌چت روی **{title}** تنظیم شد.",
@@ -349,6 +402,10 @@ STRINGS = {
     "security_off": "🛡 امنیت کال غیرفعال شد.",
     "security_age_set": "🥶 قدمت عضویت لازم روی **{days} روز** تنظیم شد.",
     "security_age_prompt": "تعداد روز را بفرستید (مثال: `قدمت اکانت 7`).",
+    "mute_join_on": "🎤 میوت ورودی کال فعال شد؛ اعضای تازه‌وارد باید اجازهٔ صحبت بگیرند.",
+    "mute_join_off": "🎤 میوت ورودی کال غیرفعال شد.",
+    "call_message_on": "💬 پیام‌های ویس‌چت در گروه نگه داشته می‌شوند.",
+    "call_message_off": "💬 پیام‌های ویس‌چت از این پس پاک می‌شوند.",
     # ── لاگ ──────────────────────────────────────────────────────────────────
     "log_new_chat": "🆕 **گروه جدید**\nنام: {title}\nآیدی: `{chat_id}`\nافزوده توسط: {user}",
     "log_left_chat": "👋 **خروج از گروه**\nنام: {title}\nآیدی: `{chat_id}`",

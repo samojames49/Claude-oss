@@ -119,6 +119,7 @@ LIVE_CHANNELS_FILE = _str("LIVE_CHANNELS_FILE", "")  # پیش‌فرض: player/d
 
 # ── زیرنویس ───────────────────────────────────────────────────────────────────
 SUBTITLE_ENABLED = _bool("SUBTITLE_ENABLED", True)
+SUBTITLE_LANG = _str("SUBTITLE_LANG", "fa")
 SUBTITLE_FONT_SIZE = _int("SUBTITLE_FONT_SIZE", 20) or 20
 SUBTITLE_MAX_MB = _int("SUBTITLE_MAX_MB", 5) or 5
 

@@ -154,11 +154,28 @@ async def id_command(_client: Client, message, s):
 @Client.on_message(filters.video_chat_started & filters.group, group=2)
 async def voice_chat_started(_client: Client, message):
     callwatch.mark_open(message.chat.id)
+    await _clean_service_message(message)
 
 
 @Client.on_message(filters.video_chat_ended & filters.group, group=2)
 async def voice_chat_ended(_client: Client, message):
     await callwatch.mark_closed(message.chat.id)
+    await _clean_service_message(message)
+
+
+@Client.on_message(filters.video_chat_members_invited & filters.group, group=2)
+async def voice_chat_invited(_client: Client, message):
+    await _clean_service_message(message)
+
+
+async def _clean_service_message(message) -> None:
+    """با «پیام کال غیرفعال» پیام‌های سرویسی ویس‌چت در گروه نگه داشته نمی‌شوند."""
+    if db.chat_setting(message.chat.id, "call_service_messages", True):
+        return
+    try:
+        await message.delete()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def _require_admin(message, s) -> bool:

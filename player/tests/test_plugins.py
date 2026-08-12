@@ -1,10 +1,23 @@
 import re
 import unittest
+from dataclasses import dataclass
 
 from pyrogram.handlers import CallbackQueryHandler
 from pyrogram.handlers.handler import Handler
 
 from player.utils import keyboards
+
+
+@dataclass
+class _FakeChannel:
+    name: str
+
+
+@dataclass
+class _FakeCategory:
+    id: str
+    title: str
+    channels: list
 
 
 def _callback_data(markup) -> list[str]:
@@ -38,6 +51,18 @@ def _all_button_data() -> set[str]:
                 "language_name": "فارسی",
             },
         ),
+        keyboards.player_home("fa"),
+        keyboards.panel_language("fa"),
+        keyboards.live_categories(
+            "fa", [_FakeCategory(id="sport", title="ورزشی", channels=[])]
+        ),
+        keyboards.live_channels(
+            "fa", "sport", [_FakeChannel(name="شبکهٔ ۱"), _FakeChannel(name="شبکهٔ ۲")]
+        ),
+    ]
+    markups += [
+        keyboards.player_section("fa", section, {})
+        for section in keyboards.PANEL_SECTIONS
     ]
     data: set[str] = set()
     for markup in markups:

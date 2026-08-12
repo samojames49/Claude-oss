@@ -226,5 +226,65 @@ def live_channels(lang: str, category_id: str, channels: list) -> InlineKeyboard
     return InlineKeyboardMarkup(rows)
 
 
+PANEL_SECTIONS = ("play", "stats", "security", "look")
+
+# کلیدهای قابل تغییر هر بخش پنل پلیر (کلید تنظیم → کلید رشتهٔ دکمه)
+PANEL_TOGGLES: dict[str, tuple[str, ...]] = {
+    "play": ("play_mode", "auto_leave", "now_playing_message", "play_in_channel"),
+    "stats": ("call_stats", "call_stats_auto", "call_stats_reset"),
+    "security": (
+        "call_security",
+        "security_mute_on_join",
+        "security_report",
+        "security_summary",
+        "security_owners_access",
+        "security_min_age_days",
+    ),
+    "look": ("classic_mode", "auto_clear", "language"),
+}
+
+
+def player_home(lang: str) -> InlineKeyboardMarkup:
+    """صفحهٔ اصلی «پنل پلیر»."""
+    s = Strings(lang)
+    return InlineKeyboardMarkup(
+        [
+            [
+                _button(s("panel_section_play"), "pnl:sec:play"),
+                _button(s("panel_section_stats"), "pnl:sec:stats"),
+            ],
+            [
+                _button(s("panel_section_security"), "pnl:sec:security"),
+                _button(s("panel_section_look"), "pnl:sec:look"),
+            ],
+            [_button(s("button_close"), "close")],
+        ]
+    )
+
+
+def panel_language(lang: str) -> InlineKeyboardMarkup:
+    """انتخاب زبان از داخل پنل پلیر (گروه هدف پنل، نه چت پیام)."""
+    s = Strings(lang)
+    rows = [[_button(name, f"pnl:lang:{code}")] for code, name in language_names().items()]
+    rows.append([_button(s("button_back"), "pnl:sec:look"), _button(s("button_close"), "close")])
+    return InlineKeyboardMarkup(rows)
+
+
+def player_section(lang: str, section: str, values: dict) -> InlineKeyboardMarkup:
+    """دکمه‌های یک بخش پنل؛ متن هر دکمه مقدار فعلی همان تنظیم را نشان می‌دهد."""
+    s = Strings(lang)
+    rows = [
+        [_button(s(f"panel_btn_{key}", value=values.get(key, "")), f"pnl:t:{key}")]
+        for key in PANEL_TOGGLES.get(section, ())
+    ]
+    if section == "security":
+        rows.append(
+            [_button(s(f"panel_age_{days}"), f"pnl:age:{days}") for days in (0, 3, 7)]
+            + [_button(s("panel_age_14"), "pnl:age:14")]
+        )
+    rows.append([_button(s("button_back"), "pnl:home"), _button(s("button_close"), "close")])
+    return InlineKeyboardMarkup(rows)
+
+
 def close_only(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[_button(Strings(lang)("button_close"), "close")]])

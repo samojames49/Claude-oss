@@ -312,8 +312,16 @@ def _download(query: str, options: dict[str, Any]) -> str | None:
         return path
 
 
-async def download(query: str, video: bool = False, audio_format: str = "m4a") -> str | None:
-    """دانلود فایل و برگرداندن مسیر آن (برای دستور /song و /video یا حالت download)."""
+async def download_media(
+    query: str,
+    video: bool = False,
+    audio_format: str = "m4a",
+    subtitle_lang: str | None = None,
+) -> tuple[str | None, str | None]:
+    """دانلود فایل و (در صورت درخواست) زیرنویس آن.
+
+    مقدار بازگشتی: (مسیر رسانه، مسیر زیرنویس یا None)
+    """
     target = query if is_url(query) else f"ytsearch1:{query}"
     outtmpl = str(config.DOWNLOADS_DIR / "%(id)s_%(format_id)s.%(ext)s")
     options = _base_options(
@@ -323,24 +331,56 @@ async def download(query: str, video: bool = False, audio_format: str = "m4a") -
         overwrites=False,
         continuedl=True,
     )
+    postprocessors: list[dict[str, Any]] = []
     if video:
         options["merge_output_format"] = "mp4"
     elif audio_format:
-        options["postprocessors"] = [
+        postprocessors.append(
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": audio_format,
                 "preferredquality": "0",
             }
-        ]
+        )
+    if subtitle_lang:
+        options.update(
+            writesubtitles=True,
+            writeautomaticsub=True,
+            subtitleslangs=[subtitle_lang, f"{subtitle_lang}-orig", f"{subtitle_lang}.*"],
+            subtitlesformat="srt/vtt/best",
+        )
+        postprocessors.append({"key": "FFmpegSubtitlesConvertor", "format": "srt"})
+    if postprocessors:
+        options["postprocessors"] = postprocessors
+
     path = await asyncio.to_thread(_download, target, options)
     if not path:
-        return None
+        return None, None
+
     candidate = Path(path)
-    if candidate.exists():
-        return str(candidate)
-    # پس از پردازش صوتی پسوند تغییر می‌کند
-    for sibling in candidate.parent.glob(candidate.stem + ".*"):
-        if sibling.exists():
-            return str(sibling)
+    if not candidate.exists():
+        # پس از پردازش صوتی پسوند تغییر می‌کند
+        for sibling in candidate.parent.glob(candidate.stem + ".*"):
+            if sibling.suffix.lower() not in (".srt", ".vtt", ".ass", ".part"):
+                candidate = sibling
+                break
+    if not candidate.exists():
+        return None, None
+
+    subtitle = _find_subtitle(candidate, subtitle_lang) if subtitle_lang else None
+    return str(candidate), subtitle
+
+
+def _find_subtitle(media: Path, lang: str) -> str | None:
+    """زیرنویس دانلودشده در کنار فایل رسانه (yt-dlp نام زبان را به فایل اضافه می‌کند)."""
+    for pattern in (f"{media.stem}*.{lang}*.srt", f"{media.stem}*.srt", f"{media.stem}*.vtt"):
+        for found in sorted(media.parent.glob(pattern)):
+            if found.exists() and found.stat().st_size > 0:
+                return str(found)
     return None
+
+
+async def download(query: str, video: bool = False, audio_format: str = "m4a") -> str | None:
+    """دانلود فایل و برگرداندن مسیر آن (برای دستور /song و /video یا حالت download)."""
+    path, _ = await download_media(query, video=video, audio_format=audio_format)
+    return path

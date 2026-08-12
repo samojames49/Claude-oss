@@ -159,6 +159,51 @@ async def play_channel_command(_client: Client, message, s):
 
 
 @Client.on_message(
+    command(["callsecurity", "security"], bare=["امنیت کال", "call security"]) & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True)
+async def call_security_command(_client: Client, message, s):
+    await _toggle(message, s, "call_security", "security_on", "security_off")
+
+
+@Client.on_message(
+    command(["muteonjoin"], bare=["میوت ورودی کال", "میوت ورودی", "mute on join"]) & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True)
+async def mute_on_join_command(_client: Client, message, s):
+    await _toggle(message, s, "security_mute_on_join", "mute_join_on", "mute_join_off")
+
+
+@Client.on_message(
+    command(["accountage"], bare=["قدمت اکانت", "account age"]) & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True)
+async def account_age_command(_client: Client, message, s):
+    """قدمت عضویتی که کاربر را از میوت خودکار ورودی معاف می‌کند."""
+    raw = to_latin_digits(argument(message)).strip()
+    if not raw.isdigit():
+        await message.reply_text(s("security_age_prompt"))
+        return
+    days = max(0, min(int(raw), 365))
+    db.set_chat_setting(message.chat.id, "security_min_age_days", days)
+    await message.reply_text(s("security_age_set", days=days))
+
+
+@Client.on_message(
+    command(["callmessage", "callcomment"], bare=["پیام کال", "مسیج کال", "کامنت کال", "call message", "call comment"])
+    & filters.group,
+    group=1,
+)
+@player_handler(admin_only=True)
+async def call_message_command(_client: Client, message, s):
+    """نگه‌داشتن یا پاک‌کردن پیام‌های سرویسی ویس‌چت (شروع/پایان/دعوت) در گروه."""
+    await _toggle(message, s, "call_service_messages", "call_message_on", "call_message_off")
+
+
+@Client.on_message(
     command(["setplayerchannel", "playerchannel"], bare=["تنظیم کانال پلیر", "set player channel"])
     & filters.group,
     group=1,

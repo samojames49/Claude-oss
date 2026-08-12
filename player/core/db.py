@@ -44,6 +44,7 @@ _CHAT_DEFAULT: dict[str, Any] = {
     # ظاهر و پیام‌ها
     "classic_mode": False,  # پاسخ‌های ساده بدون تصویر
     "auto_clear": False,  # پاک‌سازی خودکار پیام پایان پخش
+    "call_service_messages": True,  # نگه‌داشتن پیام‌های سرویسی ویس‌چت («پیام کال»)
     "media_volume": 100,  # صدای رسانه (قبل از ارسال به ویس‌چت)
     # پخش در کانال متصل
     "player_channel": 0,

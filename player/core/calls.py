@@ -43,9 +43,15 @@ def video_quality() -> VideoQuality:
 
 
 def _subtitle_filter(path: str) -> str:
-    """فیلتر ffmpeg زیرنویس با کاراکترهای فرار‌شده (مسیر ممکن است کاراکتر ویژه داشته باشد)."""
-    escaped = path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    return f"subtitles='{escaped}'"
+    """فیلتر زیرنویس ffmpeg برای یک مسیر دلخواه.
+
+    مسیر دو مرحله فرار می‌خورد: یک‌بار برای پارسر فیلترگراف ffmpeg (که `:` و `'` را
+    جداکننده می‌داند) و یک‌بار برای `shlex` که pytgcalls رشتهٔ پارامترها را با آن
+    می‌شکند؛ گیومهٔ دوتایی لازم است تا مسیرهای دارای فاصله یک آرگومان بمانند.
+    """
+    for_ffmpeg = path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    for_shlex = for_ffmpeg.replace("\\", "\\\\").replace('"', '\\"')
+    return f'subtitles="{for_shlex}"'
 
 
 def build_stream(track: Track) -> MediaStream:

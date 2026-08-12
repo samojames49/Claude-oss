@@ -37,6 +37,7 @@ class MemberState:
 
     joins: int = 0
     video_joins: int = 0
+    video_active: bool = False
     sources: set[int] = field(default_factory=set)
     endpoints: set[str] = field(default_factory=set)
     join_dates: set[int] = field(default_factory=set)
@@ -152,11 +153,14 @@ class CallSecurityService:
                 if len(state.endpoints) > 1:
                     fresh += self._record(chat_id, state, user_id, EVENT_MULTI_ENDPOINT)
 
-            if getattr(participant, "video_joined", False):
-                if is_new or not state.video_joins:
-                    state.video_joins += 1
+            # هر عضو در یک حضور فقط یک‌بار می‌تواند ویدیویی وارد شود؛ روشن‌شدن دوبارهٔ
+            # دوربین بدون لفت‌دادن، رفتار مشکوک است.
+            video_now = bool(getattr(participant, "video_joined", False))
+            if video_now and not state.video_active:
+                state.video_joins += 1
                 if state.video_joins > 1:
                     fresh += self._record(chat_id, state, user_id, EVENT_VIDEO_REJOIN)
+            state.video_active = video_now
 
             if is_new:
                 await self._maybe_mute(chat_id, user_id, participant, privileged)
@@ -165,6 +169,7 @@ class CallSecurityService:
             if user_id not in seen:
                 state.present = False
                 state.video_joins = 0
+                state.video_active = False
 
         return fresh
 
