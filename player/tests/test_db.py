@@ -35,6 +35,18 @@ class TestDatabase(unittest.TestCase):
         self.db.set_chat_setting(-100, "play_mode", "admins")
         self.assertEqual(self.db.chat_setting(-100, "play_mode", "everyone"), "admins")
 
+    def test_reading_settings_does_not_register_chat(self):
+        """خواندن تنظیمات (مثلاً برای زبانِ یک چت خصوصی) نباید گروه جدیدی بسازد."""
+        self.assertEqual(self.db.chat_setting(123456, "language", "fa"), "fa")
+        self.assertIsNone(self.db.get_chat(123456))
+        self.assertEqual(self.db.served_chats(), [])
+        self.assertFalse(self.db.is_served_chat(123456))
+
+    def test_chat_setting_falls_back_to_default_for_missing_key(self):
+        self.db.add_chat(-100, "گروه")
+        self.db.chat(-100).pop("play_mode", None)
+        self.assertEqual(self.db.chat_setting(-100, "play_mode", "everyone"), "everyone")
+
     def test_auth_users(self):
         self.assertTrue(self.db.add_auth_user(-100, 7, "کاربر"))
         self.assertFalse(self.db.add_auth_user(-100, 7, "کاربر"))

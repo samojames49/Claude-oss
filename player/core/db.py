@@ -143,8 +143,15 @@ class Database:
                 continue
         return out
 
+    def get_chat(self, chat_id: int) -> dict[str, Any] | None:
+        """خواندن گروه بدون ساختن ردیف جدید."""
+        return self._data.get("chats", {}).get(str(chat_id))
+
     def chat_setting(self, chat_id: int, key: str, default: Any = None) -> Any:
-        value = self.chat(chat_id).get(key)
+        entry = self.get_chat(chat_id)
+        if entry is None:
+            return default
+        value = entry.get(key, _CHAT_DEFAULT.get(key))
         return default if value is None else value
 
     def set_chat_setting(self, chat_id: int, key: str, value: Any) -> None:
