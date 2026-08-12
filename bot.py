@@ -1,6 +1,7 @@
 from pyrogram import Client, filters, enums, idle
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.enums import ButtonStyle
+import compat
+from compat import ButtonStyle
 from pyrogram.errors import SessionPasswordNeeded, MessageNotModified, RPCError, UserNotParticipant
 import json, os, asyncio, subprocess, sys, time, threading, html, random, signal
 
@@ -2480,7 +2481,6 @@ async def handle_admin_input(client, message: Message):
         try:
             await bot.send_message(set_target, f"🔧 موجودی سکه شما تنظیم شد\n💰 جدید: {amount} سکه")
         except: pass
-from pyrogram.enums import ButtonStyle
 
 @bot.on_message(filters.command("start"))
 async def start_handler(client, message: Message):
