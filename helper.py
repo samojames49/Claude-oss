@@ -155,36 +155,31 @@ CLOCK_SIMPLE_TEXT = """
 🔹 برای تغییر فونت روی دکمه فونت کلیک کنید
 """
 HELP_TEXTS = {
-    "economy": """
-🪙 <b>اقتصاد و گردونهٔ شانس (Self Saz)</b>
+    "mewgames": """
+🐱 <b>بازی‌های خودکار ربات میو</b>
 
-<b>دستورات قابل کپی:</b>
-<code>گردونه</code>
-<code>موجودی</code>
-<code>برترین</code>
+این‌ها بازی‌های خودِ <b>ربات میو</b> هستند؛ سلف فقط کلمهٔ بازی را روی
+کول‌داونِ دلخواه برای ربات میو می‌فرستد تا خودکار انجام شود
+(دقیقاً مثل تایمر «میو»). دستورها را در همان چتی که ربات میو هست بزنید.
 
-<b>کاربرد:</b>
-«گردونه» هر ۲۴ ساعت یک‌بار سکهٔ تصادفی (۱ تا ۱۰۰) می‌دهد.
-«موجودی» موجودی سکهٔ شما را نشان می‌دهد.
-«برترین» جدول ردهٔ کاربران این سرور را بر اساس سکه نشان می‌دهد.
-💡 اقتصاد کاملاً محلی است و روی همین سرور ذخیره می‌شود.
-""",
-    "games": """
-🎮 <b>بازی‌های سکه‌ای (Self Saz)</b>
+<b>میان‌بُرهای آماده:</b>
+<code>ماهیگیری خودکار &lt;دقیقه&gt;</code>
+<code>آشپزی خودکار &lt;دقیقه&gt;</code>
+<code>کارخونه خودکار &lt;دقیقه&gt;</code>
+<code>گربه خودکار &lt;دقیقه&gt;</code>
+<code>میو کوین خودکار &lt;دقیقه&gt;</code>
+توقف هرکدام: <code>ماهیگیری خاموش</code> و... .
 
-<b>دستورات قابل کپی:</b>
-<code>ماهیگیری</code>
-<code>آشپزی</code>
-<code>کارخونه</code>
-<code>برداشت کارخونه</code>
-<code>حدس تاس &lt;عدد&gt; &lt;شرط&gt;</code>
+<b>حالت دلخواه (هر کلمه‌ای):</b>
+<code>بازی خودکار &lt;کلمه&gt; &lt;دقیقه&gt;</code>
+<code>توقف بازی &lt;کلمه&gt;</code>
+<code>لیست بازی</code>
+<code>توقف همه بازی</code>
 
-<b>کاربرد:</b>
-🎣 ماهیگیری: هر ۳ دقیقه یک صید و سکه.
-👨‍🍳 آشپزی: هر ۵ دقیقه یک غذا و سکه.
-🏭 کارخونه: هر دقیقه ۱ سکه تولید می‌کند (سقف ۵۰۰)؛ با «برداشت کارخونه» جمع کن.
-🎲 حدس تاس: روی عددی بین ۱ تا ۶ شرط ببند؛ درست حدس بزنی ۵ برابر می‌بری.
-مثال: <code>حدس تاس 4 50</code>
+<b>مثال:</b>
+<code>ماهیگیری خودکار 5</code>  (هر ۵ دقیقه «ماهیگیری» می‌فرستد)
+<code>بازی خودکار حدس تاس 3</code>
+💡 عدد = فاصلهٔ زمانی بین ارسال‌ها به دقیقه (اعشار هم مجاز است).
 """,
     "downloads": """
 ⏬ <b>دانلود تیک‌تاک/ساندکلاود/یوتیوب</b>
@@ -1286,10 +1281,7 @@ def get_main_menu(user_id):
             InlineKeyboardButton("📱 نشست‌ها / گوشی‌ها", callback_data=f"help_sessions_{user_id}_1", style="danger"),
             InlineKeyboardButton("👀 خواندن همه چت‌ها", callback_data=f"help_readall_{user_id}_1", style="primary")
         ],
-        [
-            InlineKeyboardButton("🪙 اقتصاد و گردونه", callback_data=f"help_economy_{user_id}_1", style="warning"),
-            InlineKeyboardButton("🎮 بازی‌های سکه‌ای", callback_data=f"help_games_{user_id}_1", style="warning")
-        ],
+        [InlineKeyboardButton("🐱 بازی‌های خودکار میو", callback_data=f"help_mewgames_{user_id}_1", style="warning")],
         [
             InlineKeyboardButton("⏬ دانلود تیک‌تاک/ساندکلاود", callback_data=f"help_downloads_{user_id}_1", style="primary"),
             InlineKeyboardButton("🎧 ویس‌چت / پخش", callback_data=f"help_voicechat_{user_id}_1", style="secondary")

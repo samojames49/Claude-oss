@@ -4958,246 +4958,153 @@ async def calc_mode_command(client, message):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# اقتصاد محلی سبک Self Saz: سکه، گردونهٔ شانس، بازی‌ها و برترین‌ها
-# (کاملاً محلی روی همین سرور؛ بدون نیاز به سرور بیرونی)
+# بازی‌های خودکار ربات میو (@) — ارسال خودکار کلمهٔ بازی، مثل تایمر «میو»
+# این‌ها بازی‌های خودِ ربات میو هستند؛ سلف فقط کلمهٔ بازی را روی کول‌داون برای
+# ربات میو می‌فرستد تا خودکار بازی/برداشت انجام شود.
 # ════════════════════════════════════════════════════════════════════════════
 
-ECONOMY_FILE = f"economy_{USER_ID}.json" if USER_ID else "economy.json"
+game_timers = {}  # {(chat_id, keyword): {"task","interval","count","minutes","started_at","keyword"}}
+
+# نگاشت نام کوتاه بازی → کلمه‌ای که برای ربات میو ارسال می‌شود
+_MEW_GAMES = {
+    "ماهیگیری": "ماهیگیری",
+    "آشپزی": "آشپزی",
+    "کارخونه": "کارخونه",
+    "گربه": "گربه",
+    "سکه گربه": "سکه گربه",
+    "میو کوین": "میو کوین",
+    "میو": "میو",
+}
 
 
-def _load_economy() -> dict:
+async def _game_sender(client, chat_id, keyword, interval):
+    """ارسال دوره‌ای کلمهٔ بازی به چتِ ربات میو تا وقتی متوقف نشده."""
+    key = (chat_id, keyword)
+    count = 0
     try:
-        if os.path.exists(ECONOMY_FILE):
-            with open(ECONOMY_FILE, "r", encoding="utf-8") as f:
-                d = json.load(f)
-        else:
-            d = {}
-    except Exception:
-        d = {}
-    d.setdefault("coins", 0)
-    d.setdefault("cooldowns", {})
-    d.setdefault("factory", {})
-    d.setdefault("name", "")
-    d.setdefault("user_id", USER_ID or 0)
-    return d
+        while key in game_timers:
+            try:
+                await client.send_message(chat_id, keyword)
+                count += 1
+                if key in game_timers:
+                    game_timers[key]["count"] = count
+                print(f"🎮 بازی خودکار «{keyword}» شمارهٔ {count} به {chat_id} ارسال شد")
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+                continue
+            except Exception as e:
+                print(f"❌ خطا در بازی خودکار «{keyword}» در {chat_id}: {e}")
+                game_timers.pop(key, None)
+                break
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        print(f"⏹️ بازی خودکار «{keyword}» در {chat_id} متوقف شد (تعداد: {count})")
 
 
-def _save_economy(d: dict):
-    try:
-        tmp = f"{ECONOMY_FILE}.tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(d, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, ECONOMY_FILE)
-    except Exception as e:
-        print(f"❌ خطا در ذخیرهٔ اقتصاد: {e}")
+def _start_game_timer(client, chat_id, keyword, minutes):
+    key = (chat_id, keyword)
+    old = game_timers.pop(key, None)
+    if old and old.get("task") and not old["task"].done():
+        old["task"].cancel()
+    interval = max(1, int(minutes * 60))
+    task = asyncio.create_task(_game_sender(client, chat_id, keyword, interval))
+    game_timers[key] = {
+        "task": task, "interval": interval, "count": 0,
+        "minutes": minutes, "started_at": datetime.now(), "keyword": keyword,
+    }
 
 
-def _fmt_coins(n) -> str:
-    return f"{int(n):,}"
+def _stop_game_timer(chat_id, keyword):
+    entry = game_timers.pop((chat_id, keyword), None)
+    if entry:
+        t = entry.get("task")
+        if t and not t.done():
+            t.cancel()
+        return entry.get("count", 0)
+    return None
 
 
-def _human_left(sec) -> str:
-    sec = int(max(0, sec))
-    m, s = divmod(sec, 60)
-    h, m = divmod(m, 60)
-    if h:
-        return f"{h} ساعت و {m} دقیقه"
-    if m:
-        return f"{m} دقیقه و {s} ثانیه"
-    return f"{s} ثانیه"
-
-
-def _cooldown_left(d, key, seconds) -> float:
-    last = d.get("cooldowns", {}).get(key, 0)
-    return seconds - (time.time() - last)
-
-
-async def _touch_name(client, d):
-    try:
-        d["name"] = (await client.get_me()).first_name or d.get("name", "")
-    except Exception:
-        pass
-
-
-_FISH_CATCHES = [
-    ("🐟 ماهی معمولی", 3), ("🐠 ماهی رنگی", 6), ("🐡 ماهی بادکنکی", 10),
-    ("🦐 میگو", 4), ("🦀 خرچنگ", 8), ("🐙 اختاپوس", 15),
-    ("🦑 ماهی مرکب", 12), ("🐢 لاک‌پشت (رها شد)", 0), ("🥾 چکمهٔ کهنه!", 0),
-    ("🐳 نهنگ کوچک", 40), ("🦈 کوسه!", 60),
-]
-_COOK_DISHES = [
-    ("🍕 پیتزا", 12), ("🍔 برگر", 10), ("🍜 نودل", 8), ("🥗 سالاد", 5),
-    ("🍣 سوشی", 18), ("🎂 کیک", 15), ("🔥 غذا سوخت!", 0), ("🍲 آبگوشت", 9),
-]
-
-
-@app.on_message(filters.me & filters.regex(r"^(موجودی|سکه های من|سکه‌های من|کیف پول)$"))
-async def balance_command(client, message):
-    d = _load_economy()
-    await message.edit(
-        f"💰 <b>کیف پول شما</b>\n\n🪙 موجودی: <b>{_fmt_coins(d['coins'])}</b> سکه",
-        parse_mode=enums.ParseMode.HTML,
-    )
-
-
-@app.on_message(filters.me & filters.regex(r"^گردونه$"))
-async def wheel_command(client, message):
-    d = _load_economy()
-    left = _cooldown_left(d, "daily", 86400)
-    if left > 0:
-        return await message.edit(
-            f"🎡 <b>گردونهٔ شانس روزانه</b>\n\n⏳ نوبت بعدی تا <b>{_human_left(left)}</b> دیگر.",
-            parse_mode=enums.ParseMode.HTML,
-        )
-    rewards = [1, 2, 5, 10, 20, 50, 100]
-    weights = [26, 24, 20, 14, 9, 5, 2]
-    prize = random.choices(rewards, weights=weights)[0]
-    d["cooldowns"]["daily"] = time.time()
-    d["coins"] = int(d["coins"]) + prize
-    await _touch_name(client, d)
-    _save_economy(d)
-    await message.edit(
-        f"🎡 <b>گردونهٔ شانس روزانه</b>\n\n🎉 برنده شدی: <b>{prize}</b> سکه 🪙\n"
-        f"💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-        parse_mode=enums.ParseMode.HTML,
-    )
-
-
-@app.on_message(filters.me & filters.regex(r"^(ماهیگیری|ماهی گیری|ماهی)$"))
-async def fishing_command(client, message):
-    d = _load_economy()
-    left = _cooldown_left(d, "fish", 180)
-    if left > 0:
-        return await message.edit(f"🎣 قلاب خیس است! تا <b>{_human_left(left)}</b> دیگر صبر کن.",
-                                  parse_mode=enums.ParseMode.HTML)
-    catch, value = random.choice(_FISH_CATCHES)
-    d["cooldowns"]["fish"] = time.time()
-    d["coins"] = int(d["coins"]) + value
-    await _touch_name(client, d)
-    _save_economy(d)
-    if value == 0:
-        await message.edit(f"🎣 صید کردی: {catch}\nسکه‌ای نصیبت نشد 😅")
-    else:
-        await message.edit(
-            f"🎣 صید کردی: {catch}\n🪙 <b>+{value}</b> سکه | موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-            parse_mode=enums.ParseMode.HTML,
-        )
-
-
-@app.on_message(filters.me & filters.regex(r"^(آشپزی|اشپزی|آشپز)$"))
-async def cooking_command(client, message):
-    d = _load_economy()
-    left = _cooldown_left(d, "cook", 300)
-    if left > 0:
-        return await message.edit(f"👨‍🍳 آشپزخانه مشغول است! تا <b>{_human_left(left)}</b> دیگر صبر کن.",
-                                  parse_mode=enums.ParseMode.HTML)
-    dish, value = random.choice(_COOK_DISHES)
-    d["cooldowns"]["cook"] = time.time()
-    d["coins"] = int(d["coins"]) + value
-    await _touch_name(client, d)
-    _save_economy(d)
-    if value == 0:
-        await message.edit(f"👨‍🍳 پختی: {dish}\nحیف شد، سکه‌ای نگرفتی 😬")
-    else:
-        await message.edit(
-            f"👨‍🍳 پختی: {dish}\n🪙 <b>+{value}</b> سکه | موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-            parse_mode=enums.ParseMode.HTML,
-        )
-
-
-@app.on_message(filters.me & filters.regex(r"^کارخونه$"))
-async def factory_command(client, message):
-    d = _load_economy()
-    fac = d["factory"]
-    now = time.time()
-    if not fac.get("start"):
-        fac["start"] = now
-        _save_economy(d)
-        return await message.edit(
-            "🏭 <b>کارخونه راه‌اندازی شد!</b>\n\n⚙️ هر دقیقه ۱ سکه تولید می‌کند (سقف ۵۰۰).\n"
-            "برای برداشت بنویس: <code>برداشت کارخونه</code>",
-            parse_mode=enums.ParseMode.HTML,
-        )
-    produced = min(int((now - fac["start"]) / 60), 500)
-    await message.edit(
-        f"🏭 <b>کارخونه فعال است</b>\n\n⚙️ تولیدشده: <b>{produced}</b> سکه (سقف ۵۰۰)\n"
-        f"برای برداشت: <code>برداشت کارخونه</code>",
-        parse_mode=enums.ParseMode.HTML,
-    )
-
-
-@app.on_message(filters.me & filters.regex(r"^برداشت کارخونه$"))
-async def factory_collect_command(client, message):
-    d = _load_economy()
-    fac = d["factory"]
-    if not fac.get("start"):
-        return await message.edit("🏭 کارخونه هنوز راه‌اندازی نشده. اول <code>کارخونه</code> را بفرست.",
-                                  parse_mode=enums.ParseMode.HTML)
-    produced = min(int((time.time() - fac["start"]) / 60), 500)
-    if produced <= 0:
-        return await message.edit("🏭 هنوز چیزی تولید نشده؛ کمی صبر کن.")
-    d["coins"] = int(d["coins"]) + produced
-    fac["start"] = time.time()
-    await _touch_name(client, d)
-    _save_economy(d)
-    await message.edit(
-        f"🏭 برداشت شد: <b>{produced}</b> سکه 🪙\n💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-        parse_mode=enums.ParseMode.HTML,
-    )
-
-
-@app.on_message(filters.me & filters.regex(r"^(حدس تاس|شرط تاس) ([\d۰-۹]) ([\d۰-۹]+)$"))
-async def dice_bet_command(client, message):
-    d = _load_economy()
+@app.on_message(filters.me & filters.regex(r"^بازی خودکار (.+?) ([\d۰-۹]+(?:[\.٫][\d۰-۹]+)?)$"))
+async def game_auto_start(client, message):
     m = message.matches[0]
-    guess = _to_int(m.group(2))
-    bet = _to_int(m.group(3))
-    if not (1 <= guess <= 6):
-        return await message.edit("🎲 عدد حدس باید بین ۱ تا ۶ باشد.")
-    if bet <= 0 or bet > int(d["coins"]):
-        return await message.edit(f"🎲 مقدار شرط نامعتبر است. موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-                                  parse_mode=enums.ParseMode.HTML)
-    roll = random.randint(1, 6)
-    if roll == guess:
-        win = bet * 5
-        d["coins"] = int(d["coins"]) + win
-        result = f"🎉 بردی! تاس {roll} آمد.\n🪙 <b>+{win}</b> سکه"
+    keyword = m.group(1).strip()
+    try:
+        minutes = float(m.group(2).translate(_FA_DIGITS).replace("٫", "."))
+    except Exception:
+        return await message.edit("❌ زمان نامعتبر است.")
+    if minutes <= 0 or minutes > 1440:
+        return await message.edit("❌ زمان باید بین ۰ تا ۱۴۴۰ دقیقه باشد.")
+    _start_game_timer(client, message.chat.id, keyword, minutes)
+    await message.edit(
+        f"🎮 <b>بازی خودکار میو</b>\n\n🔤 کلمه: <code>{keyword}</code>\n"
+        f"⏰ هر <b>{minutes}</b> دقیقه ارسال می‌شود (اولین ارسال هم‌اکنون).\n"
+        f"❌ توقف: <code>توقف بازی {keyword}</code>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^توقف بازی (.+)$"))
+async def game_auto_stop(client, message):
+    keyword = message.matches[0].group(1).strip()
+    count = _stop_game_timer(message.chat.id, keyword)
+    if count is None:
+        await message.edit(f"⚠️ بازی خودکار «{keyword}» در این چت فعال نبود.")
     else:
-        d["coins"] = int(d["coins"]) - bet
-        result = f"😔 باختی! تاس {roll} آمد (حدس تو {guess} بود).\n🪙 <b>-{bet}</b> سکه"
-    await _touch_name(client, d)
-    _save_economy(d)
-    await message.edit(f"🎲 <b>حدس تاس</b>\n\n{result}\n💰 موجودی: <b>{_fmt_coins(d['coins'])}</b>",
-                       parse_mode=enums.ParseMode.HTML)
+        await message.edit(f"⏹ بازی خودکار «{keyword}» متوقف شد. (تعداد ارسال: {count})")
 
 
-@app.on_message(filters.me & filters.regex(r"^برترین(?: ها|‌ها)?$"))
-async def leaderboard_command(client, message):
-    import glob as _glob
-    entries = []
-    for fpath in _glob.glob("economy_*.json"):
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                dd = json.load(f)
-            entries.append((dd.get("name") or f"کاربر {dd.get('user_id','?')}", int(dd.get("coins", 0))))
-        except Exception:
-            continue
-    if not entries and os.path.exists("economy.json"):
-        try:
-            with open("economy.json", "r", encoding="utf-8") as f:
-                dd = json.load(f)
-            entries.append((dd.get("name") or "شما", int(dd.get("coins", 0))))
-        except Exception:
-            pass
-    entries.sort(key=lambda x: x[1], reverse=True)
-    medals = ["🥇", "🥈", "🥉"]
-    lines = ["🏆 <b>برترین‌ها (بیشترین سکه)</b>\n"]
-    for i, (name, coins) in enumerate(entries[:10]):
-        badge = medals[i] if i < 3 else f"{i+1}."
-        lines.append(f"{badge} {name} — <b>{_fmt_coins(coins)}</b> 🪙")
-    if len(lines) == 1:
-        lines.append("هنوز کسی سکه‌ای جمع نکرده. با «گردونه» شروع کن!")
+@app.on_message(filters.me & filters.regex(r"^(لیست بازی|بازی های خودکار|بازی‌های خودکار)$"))
+async def game_auto_list(client, message):
+    if not game_timers:
+        return await message.edit("🎮 هیچ بازی خودکاری فعال نیست.")
+    lines = ["🎮 <b>بازی‌های خودکار فعال:</b>\n"]
+    for (cid, kw), info in game_timers.items():
+        scope = "این چت" if cid == message.chat.id else f"<code>{cid}</code>"
+        lines.append(f"• <code>{kw}</code> — هر {info.get('minutes')} دقیقه | ارسال: {info.get('count', 0)} | {scope}")
     await message.edit("\n".join(lines), parse_mode=enums.ParseMode.HTML)
+
+
+@app.on_message(filters.me & filters.regex(r"^توقف همه بازی$"))
+async def game_auto_stop_all(client, message):
+    n = 0
+    for key in list(game_timers.keys()):
+        entry = game_timers.pop(key, None)
+        if entry and entry.get("task") and not entry["task"].done():
+            entry["task"].cancel()
+            n += 1
+    await message.edit(f"⏹ همهٔ بازی‌های خودکار متوقف شدند. ({n} مورد)")
+
+
+@app.on_message(filters.me & filters.regex(
+    r"^(ماهیگیری|آشپزی|کارخونه|گربه|سکه گربه|میو کوین) خودکار ([\d۰-۹]+(?:[\.٫][\d۰-۹]+)?)$"))
+async def mew_game_shortcut_start(client, message):
+    m = message.matches[0]
+    name = m.group(1)
+    keyword = _MEW_GAMES.get(name, name)
+    try:
+        minutes = float(m.group(2).translate(_FA_DIGITS).replace("٫", "."))
+    except Exception:
+        return await message.edit("❌ زمان نامعتبر است.")
+    if minutes <= 0 or minutes > 1440:
+        return await message.edit("❌ زمان باید بین ۰ تا ۱۴۴۰ دقیقه باشد.")
+    _start_game_timer(client, message.chat.id, keyword, minutes)
+    await message.edit(
+        f"🎮 <b>بازی خودکار «{name}» فعال شد</b>\n\n"
+        f"⏰ هر <b>{minutes}</b> دقیقه کلمهٔ <code>{keyword}</code> برای ربات میو ارسال می‌شود.\n"
+        f"❌ توقف: <code>{name} خاموش</code>",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^(ماهیگیری|آشپزی|کارخونه|گربه|سکه گربه|میو کوین) خاموش$"))
+async def mew_game_shortcut_stop(client, message):
+    name = message.matches[0].group(1)
+    keyword = _MEW_GAMES.get(name, name)
+    count = _stop_game_timer(message.chat.id, keyword)
+    if count is None:
+        await message.edit(f"⚠️ بازی خودکار «{name}» در این چت فعال نبود.")
+    else:
+        await message.edit(f"⏹ بازی خودکار «{name}» متوقف شد. (تعداد ارسال: {count})")
 
 
 # ════════════════════════════════════════════════════════════════════════════
