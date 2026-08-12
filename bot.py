@@ -805,11 +805,11 @@ async def group_balance_handler(client, message: Message):
     if not ok:
         buttons = []
         for ch in FORCE_CHANNELS:
-            buttons.append([InlineKeyboardButton(f"● عضویت در @{ch}", url=f"https://t.me/{ch}")])
-        buttons.append([InlineKeyboardButton("● بررسی مجدد", callback_data="check_join")])
+            buttons.append([InlineKeyboardButton(f"عضویت در @{ch}", url=f"https://t.me/{ch}")])
+        buttons.append([InlineKeyboardButton("بررسی مجدد", callback_data="check_join")])
         
         await message.reply_text(
-            "● <b>برای مشاهده موجودی باید در کانال‌های زیر عضو باشید:</b>\n\n" +
+            "<b>برای مشاهده موجودی باید در کانال‌های زیر عضو باشید:</b>\n\n" +
             "\n".join([f"• @{channel}" for channel in FORCE_CHANNELS]),
             reply_markup=InlineKeyboardMarkup(buttons),
             parse_mode=enums.ParseMode.HTML
@@ -828,10 +828,10 @@ async def group_balance_handler(client, message: Message):
     ])
     
     balance_text = f"""
-<b>● اطلاعات کاربر●</b>
+<b>اطلاعات کاربر</b>
 
-<b>● آیدی عددی:</b> <code>{font_convert(user_id)}</code>
-<b>● نام:</b> {user_mention}
+<b>آیدی عددی:</b> <code>{font_convert(user_id)}</code>
+<b>نام:</b> {user_mention}
 """
     
     await message.reply_text(
@@ -1020,25 +1020,25 @@ async def transfer_coins_handler(client, message: Message):
 
     await message.reply_text(
         f"✔️ <b>انتقال سکه انجام شد!</b>\n\n"
-        f"● <b>فرستنده:</b> {sender_mention}\n"
-        f"● <b>گیرنده:</b> {receiver_mention}\n"
-        f"● <b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
-        f"● <b>مالیات ({tax_percent}%):</b> <code>{tax_amount}</code> سکه\n"
-        f"● <b>مبلغ دریافتی گیرنده:</b> <code>{final_amount}</code> سکه\n\n"
-        f"● <b>موجودی {sender_name}:</b> <code>{db.get('credits', sender_id, 0)}</code> سکه\n"
-        f"● <b>موجودی {receiver_name}:</b> <code>{db.get('credits', receiver_id, 0)}</code> سکه",
+        f"<b>فرستنده:</b> {sender_mention}\n"
+        f"<b>گیرنده:</b> {receiver_mention}\n"
+        f"<b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
+        f"<b>مالیات ({tax_percent}%):</b> <code>{tax_amount}</code> سکه\n"
+        f"<b>مبلغ دریافتی گیرنده:</b> <code>{final_amount}</code> سکه\n\n"
+        f"<b>موجودی {sender_name}:</b> <code>{db.get('credits', sender_id, 0)}</code> سکه\n"
+        f"<b>موجودی {receiver_name}:</b> <code>{db.get('credits', receiver_id, 0)}</code> سکه",
         parse_mode=enums.ParseMode.HTML
     )
     
     try:
         await client.send_message(
             sender_id,
-            f"● <b>انتقال سکه انجام شد!</b>\n\n"
-            f"● <b>گیرنده:</b> {receiver_mention}\n"
-            f"● <b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
-            f"● <b>مالیات ({tax_percent}%):</b> <code>{tax_amount}</code> سکه\n"
-            f"● <b>مبلغ دریافتی گیرنده:</b> <code>{final_amount}</code> سکه\n\n"
-            f"● <b>موجودی جدید شما:</b> <code>{db.get('credits', sender_id, 0)}</code> سکه",
+            f"<b>انتقال سکه انجام شد!</b>\n\n"
+            f"<b>گیرنده:</b> {receiver_mention}\n"
+            f"<b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
+            f"<b>مالیات ({tax_percent}%):</b> <code>{tax_amount}</code> سکه\n"
+            f"<b>مبلغ دریافتی گیرنده:</b> <code>{final_amount}</code> سکه\n\n"
+            f"<b>موجودی جدید شما:</b> <code>{db.get('credits', sender_id, 0)}</code> سکه",
             parse_mode=enums.ParseMode.HTML
         )
     except Exception as e:
@@ -1047,12 +1047,12 @@ async def transfer_coins_handler(client, message: Message):
     try:
         await client.send_message(
             receiver_id,
-            f"● <b>سکه دریافت کردید!</b>\n\n"
-            f"● <b>از طرف:</b> {sender_mention}\n"
-            f"● <b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
-            f"● <b>مالیات کسر شده:</b> <code>{tax_amount}</code> سکه\n"
-            f"● <b>مبلغ دریافتی:</b> <code>{final_amount}</code> سکه\n\n"
-            f"● <b>موجودی جدید شما:</b> <code>{db.get('credits', receiver_id, 0)}</code> سکه",
+            f"<b>سکه دریافت کردید!</b>\n\n"
+            f"<b>از طرف:</b> {sender_mention}\n"
+            f"<b>مبلغ اصلی:</b> <code>{amount}</code> سکه\n"
+            f"<b>مالیات کسر شده:</b> <code>{tax_amount}</code> سکه\n"
+            f"<b>مبلغ دریافتی:</b> <code>{final_amount}</code> سکه\n\n"
+            f"<b>موجودی جدید شما:</b> <code>{db.get('credits', receiver_id, 0)}</code> سکه",
             parse_mode=enums.ParseMode.HTML
         )
     except Exception as e:
@@ -1765,14 +1765,14 @@ async def callback_handler(client, callback_query):
             verified_status = "✅ احراز شده"
     
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("● فعالسازی ●", callback_data="login", style=ButtonStyle.SUCCESS)],
+            [InlineKeyboardButton("فعالسازی", callback_data="login", style=ButtonStyle.SUCCESS)],
             [
-                InlineKeyboardButton("● حساب کاربری ●", callback_data="status_credits", style=ButtonStyle.PRIMARY),
-                InlineKeyboardButton("● شرطبندی ●", callback_data="bet", style=ButtonStyle.PRIMARY)
+                InlineKeyboardButton("حساب کاربری", callback_data="status_credits", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton("شرطبندی", callback_data="bet", style=ButtonStyle.PRIMARY)
             ],
             [
-                InlineKeyboardButton("● مدیریت سلف ●", callback_data="self_management", style=ButtonStyle.DANGER),
-                InlineKeyboardButton("● افزایش موجودی ●", callback_data="increase_balance", style=ButtonStyle.DANGER)
+                InlineKeyboardButton("مدیریت سلف", callback_data="self_management", style=ButtonStyle.DANGER),
+                InlineKeyboardButton("افزایش موجودی", callback_data="increase_balance", style=ButtonStyle.DANGER)
             ]
         ])
         if user_id == ADMIN_ID:
@@ -1780,7 +1780,7 @@ async def callback_handler(client, callback_query):
                 InlineKeyboardButton("🛠 پنل ادمین", callback_data="admin_panel", style=ButtonStyle.DANGER)
             ])
     
-        text = f"""<b>🤖 ربات مدیریت سلف بات</b>
+        text = f"""<b>Creeps | سلف ساز</b>
 
     <b>وضعیت:</b> {status_text}{phone_text}
     <b>🔐 احراز:</b> {verified_status}
@@ -2071,7 +2071,7 @@ async def callback_handler(client, callback_query):
                 reply_markup=InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton(
-                        "● فعالسازی ●",
+                        "فعالسازی",
                             callback_data="login",
                             style=ButtonStyle.SUCCESS  # سبز
                         )
@@ -2232,7 +2232,7 @@ async def callback_handler(client, callback_query):
                 reply_markup=InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton(
-            "● فعالسازی ●",
+            "فعالسازی",
                             callback_data="login",
                             style=ButtonStyle.SUCCESS  
                         )
@@ -2315,7 +2315,7 @@ async def callback_handler(client, callback_query):
     
         if not user_data.get('verified'):
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("● احراز هویت ●", callback_data="start_verification", style=ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton("احراز هویت", callback_data="start_verification", style=ButtonStyle.SUCCESS)],
                 [InlineKeyboardButton("🔙 بازگشت", callback_data="back", style=ButtonStyle.DANGER)]
             ])
         
@@ -2489,7 +2489,7 @@ async def start_handler(client, message: Message):
         buttons = []
         for ch in not_joined:
             buttons.append([InlineKeyboardButton(f"📢 عضویت در @{ch}", url=f"https://t.me/{ch}", style=ButtonStyle.PRIMARY)])
-        buttons.append([InlineKeyboardButton("● بررسی عضویت ●", callback_data="check_join", style=ButtonStyle.SUCCESS)])
+        buttons.append([InlineKeyboardButton("بررسی عضویت", callback_data="check_join", style=ButtonStyle.SUCCESS)])
         await message.reply_text(
             "❌ برای استفاده از ربات باید در تمام کانال‌های زیر عضو شوید:",
             reply_markup=InlineKeyboardMarkup(buttons)
@@ -2528,15 +2528,15 @@ async def start_handler(client, message: Message):
     
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("● فعالسازی ●", callback_data="login", style=ButtonStyle.SUCCESS)
+            InlineKeyboardButton("فعالسازی", callback_data="login", style=ButtonStyle.SUCCESS)
         ],
         [
-            InlineKeyboardButton("● حساب کاربری ●", callback_data="status_credits", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("● شرطبندی ●", callback_data="bet", style=ButtonStyle.PRIMARY)
+            InlineKeyboardButton("حساب کاربری", callback_data="status_credits", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("شرطبندی", callback_data="bet", style=ButtonStyle.PRIMARY)
         ],
         [
-            InlineKeyboardButton("● مدیریت سلف ●", callback_data="self_management", style=ButtonStyle.DANGER),
-            InlineKeyboardButton("● افزایش موجودی ●", callback_data="increase_balance", style=ButtonStyle.DANGER)
+            InlineKeyboardButton("مدیریت سلف", callback_data="self_management", style=ButtonStyle.DANGER),
+            InlineKeyboardButton("افزایش موجودی", callback_data="increase_balance", style=ButtonStyle.DANGER)
         ]
     ])
 
@@ -2545,9 +2545,9 @@ async def start_handler(client, message: Message):
             InlineKeyboardButton("🛠 پنل ادمین", callback_data="admin_panel", style=ButtonStyle.DANGER)
         ])
     
-    welcome_text = f"""<b>به ربات سلف ساز خوش آمدید!</b>
+    welcome_text = f"""<b>Creeps | سلف ساز</b>
 
-<b>ربات مدیریت سلف بات حرفه‌ای</b>
+<b>به ربات سلف ساز خوش آمدید!</b>
 ├─ ساخت سلف شخصی
 📊 وضعیت حساب شما:
 ├─ 👤 کاربر: {message.from_user.first_name or "ناشناس"}
@@ -3108,7 +3108,7 @@ async def _amain():
     BOT_LOOP = asyncio.get_running_loop()
 
     await bot.start()
-    print("● ربات سلف ساز روشن شد ●")
+    print("ربات سلف ساز روشن شد")
 
     # پس از ری‌استارت، سلف‌های زنده دوباره شناسایی و تایمر شارژشان برقرار می‌شود
     restore_running_selfbots()

@@ -847,7 +847,7 @@ def get_font_buttons(user_id, from_page=1):
         ],
         [
             InlineKeyboardButton(
-                "● بازگشت به ساعت", 
+                "بازگشت به ساعت", 
                 callback_data=f"clock_back_{user_id}_{from_page}",
                 style="primary"
             )
@@ -899,8 +899,8 @@ def get_clock_buttons(user_id, page=1):
 def get_oneclick_buttons(user_id, from_page=1):
     keyboard = [
         [
-            InlineKeyboardButton("● مدیریت ساعت ●", callback_data=f"oneclick_time_{user_id}_{from_page}", style="success"),
-            InlineKeyboardButton("● فرمت متن ●", callback_data=f"oneclick_format_{user_id}_{from_page}", style="primary")
+            InlineKeyboardButton("مدیریت ساعت", callback_data=f"oneclick_time_{user_id}_{from_page}", style="success"),
+            InlineKeyboardButton("فرمت متن", callback_data=f"oneclick_format_{user_id}_{from_page}", style="primary")
         ],
         [
             InlineKeyboardButton("🔙", callback_data=f"help_back_{user_id}_{from_page}", style="danger")
@@ -940,8 +940,8 @@ def get_format_buttons(user_id, from_page=1):
         keyboard.append(row)
     
     keyboard.append([
-        InlineKeyboardButton("● ریست همه فرمت‌ها ●", callback_data=f"format_reset_{user_id}_{from_page}"),
-        InlineKeyboardButton("● وضعیت فرمت‌ها ●", callback_data=f"format_status_{user_id}_{from_page}")
+        InlineKeyboardButton("ریست همه فرمت‌ها", callback_data=f"format_reset_{user_id}_{from_page}"),
+        InlineKeyboardButton("وضعیت فرمت‌ها", callback_data=f"format_status_{user_id}_{from_page}")
     ])
     keyboard.append([
         InlineKeyboardButton("🔙", callback_data=f"oneclick_back_{user_id}_{from_page}")
@@ -949,85 +949,8 @@ def get_format_buttons(user_id, from_page=1):
     
     return InlineKeyboardMarkup(keyboard)
 
-def get_main_menu_page1(user_id):
-    keyboard = [
-        [
-            InlineKeyboardButton("● ایدی ●", callback_data=f"help_id_{user_id}_1", style="success"),
-            InlineKeyboardButton("● یک کلیک ●", callback_data=f"help_oneclick_{user_id}_1", style="success")
-        ],
-        [
-            InlineKeyboardButton("● عکس تایمدار ●", callback_data=f"help_photo_{user_id}_1", style="danger"),
-            InlineKeyboardButton("● پشتیبان‌گیری ●", callback_data=f"help_backup_{user_id}_1", style="danger")
-        ],
-        [
-            InlineKeyboardButton("● مدیریت فونت ●", callback_data=f"help_font_{user_id}_1", style="primary"),
-            InlineKeyboardButton("● قیمت ارز ●", callback_data=f"help_price_{user_id}_1", style="primary")
-        ],
-        [
-            InlineKeyboardButton("● فرمت متن ●", callback_data=f"help_format_{user_id}_1", style="success"),
-            InlineKeyboardButton("● اسپم ●", callback_data=f"help_spam_{user_id}_1", style="success")
-        ],
-        [
-            InlineKeyboardButton("● مدیریت دشمنان●", callback_data=f"help_enemy_{user_id}_1", style="danger"),
-            InlineKeyboardButton("● پاسخ خودکار ●", callback_data=f"help_autoreply_{user_id}_1", style="danger")
-        ],
-        [
-            InlineKeyboardButton("● تاس ●", callback_data=f"help_dice_{user_id}_1", style="success"),
-            InlineKeyboardButton("● سیستم پیشی ●", callback_data=f"help_pishi_{user_id}_1", style="success")
-        ],
-        [
-            InlineKeyboardButton("➡", callback_data=f"page2_{user_id}", style="primary"),
-            InlineKeyboardButton("❌ ", callback_data=f"close_{user_id}", style="danger")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_main_menu_page2(user_id):
-    keyboard = [
-        [
-            InlineKeyboardButton("● سیستم فحش ●", callback_data=f"help_insult_{user_id}_2", style="success"),
-            InlineKeyboardButton("● همیشه آنلاین ●", callback_data=f"help_online_{user_id}_2", style="success")
-        ],
-        [
-            InlineKeyboardButton("● قفل پیوی ●", callback_data=f"help_lock_{user_id}_2", style="danger"),
-            InlineKeyboardButton("● انتی لاگین ●", callback_data=f"help_antilogin_{user_id}_2", style="danger")
-        ],
-        [
-            InlineKeyboardButton("● ریکشن خودکار ●", callback_data=f"help_reaction_{user_id}_2", style="primary"),
-            InlineKeyboardButton("● ویرایش سریع ●", callback_data=f"help_edit_{user_id}_2", style="primary")
-        ],
-        [
-            InlineKeyboardButton("● سیستم بنر ●", callback_data=f"help_banner_{user_id}_2", style="success"),
-            InlineKeyboardButton("● اینستاگرام ●", callback_data=f"help_instagram_{user_id}_2", style="success")
-        ],
-        [
-            InlineKeyboardButton("● دانلود تلگرام ●", callback_data=f"help_download_{user_id}_2", style="danger"),
-            InlineKeyboardButton("● مدیریت گروه/کانال ●", callback_data=f"help_new_{user_id}_2", style="danger")
-        ],
-        [
-            InlineKeyboardButton("● سیستم پیشی ●", callback_data=f"help_pishi_{user_id}_2", style="primary"),
-            InlineKeyboardButton("● تایمر میو ●", callback_data=f"help_mewo_{user_id}_2", style="primary")
-        ],
-        [
-            InlineKeyboardButton("● پیام زمان‌دار ●", callback_data=f"help_schedule_{user_id}_2", style="success"),
-            InlineKeyboardButton("● مدیریت اکشن ●", callback_data=f"help_action_{user_id}_2", style="success")
-        ],
-        [
-            InlineKeyboardButton("● مدیریت گروه ●", callback_data=f"help_group_{user_id}_2", style="primary")
-        ],
-        [
-            InlineKeyboardButton("⭐️ قابلیت‌های پیشرفته (VTR)", callback_data=f"advanced_{user_id}_2", style="success")
-        ],
-        [
-            InlineKeyboardButton("⬅", callback_data=f"page1_{user_id}", style="primary"),
-            InlineKeyboardButton("❌", callback_data=f"close_{user_id}", style="danger")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_advanced_buttons(user_id, page=2):
-    """منوی قابلیت‌های پیشرفتهٔ سبک Self VTR با تاگل وضعیت."""
+def get_main_menu(user_id):
+    """پنل تک‌صفحه‌ای شامل همهٔ دسترسی‌ها (بدون صفحه‌بندی و بدون زیرمنوی جدا)."""
     settings = load_settings(user_id)
     adv = settings.get('advanced', {})
 
@@ -1035,15 +958,78 @@ def get_advanced_buttons(user_id, page=2):
         return "✅" if adv.get(key) else "⬜️"
 
     keyboard = [
-        [InlineKeyboardButton(f"{mark('bio_time')} ساعت در بایو", callback_data=f"adv_biotime_{user_id}_{page}", style="primary")],
-        [InlineKeyboardButton(f"{mark('save_deleted')} ذخیره حذفیات", callback_data=f"adv_savedel_{user_id}_{page}", style="primary")],
-        [InlineKeyboardButton(f"{mark('save_edited')} ذخیره ویرایش‌ها", callback_data=f"adv_saveedit_{user_id}_{page}", style="primary")],
-        [InlineKeyboardButton("👁 رصد کاربران (راهنما)", callback_data=f"help_watch_{user_id}_{page}", style="success")],
-        [InlineKeyboardButton("🎭 پروفایل خودکار (راهنما)", callback_data=f"help_autoprofile_{user_id}_{page}", style="success")],
-        [InlineKeyboardButton("⏳ انقضا / زمان باقی‌مانده", callback_data=f"adv_expiry_{user_id}_{page}", style="danger")],
-        [InlineKeyboardButton("🔙 بازگشت", callback_data=f"help_back_{user_id}_{page}", style="danger")],
+        [
+            InlineKeyboardButton("ایدی", callback_data=f"help_id_{user_id}_1", style="success"),
+            InlineKeyboardButton("یک کلیک", callback_data=f"help_oneclick_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("عکس تایمدار", callback_data=f"help_photo_{user_id}_1", style="danger"),
+            InlineKeyboardButton("پشتیبان‌گیری", callback_data=f"help_backup_{user_id}_1", style="danger")
+        ],
+        [
+            InlineKeyboardButton("مدیریت فونت", callback_data=f"help_font_{user_id}_1", style="primary"),
+            InlineKeyboardButton("قیمت ارز", callback_data=f"help_price_{user_id}_1", style="primary")
+        ],
+        [
+            InlineKeyboardButton("فرمت متن", callback_data=f"help_format_{user_id}_1", style="success"),
+            InlineKeyboardButton("اسپم", callback_data=f"help_spam_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("مدیریت دشمنان", callback_data=f"help_enemy_{user_id}_1", style="danger"),
+            InlineKeyboardButton("پاسخ خودکار", callback_data=f"help_autoreply_{user_id}_1", style="danger")
+        ],
+        [
+            InlineKeyboardButton("تاس", callback_data=f"help_dice_{user_id}_1", style="success"),
+            InlineKeyboardButton("سیستم پیشی", callback_data=f"help_pishi_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("سیستم فحش", callback_data=f"help_insult_{user_id}_1", style="success"),
+            InlineKeyboardButton("همیشه آنلاین", callback_data=f"help_online_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("قفل پیوی", callback_data=f"help_lock_{user_id}_1", style="danger"),
+            InlineKeyboardButton("انتی لاگین", callback_data=f"help_antilogin_{user_id}_1", style="danger")
+        ],
+        [
+            InlineKeyboardButton("ریکشن خودکار", callback_data=f"help_reaction_{user_id}_1", style="primary"),
+            InlineKeyboardButton("ویرایش سریع", callback_data=f"help_edit_{user_id}_1", style="primary")
+        ],
+        [
+            InlineKeyboardButton("سیستم بنر", callback_data=f"help_banner_{user_id}_1", style="success"),
+            InlineKeyboardButton("اینستاگرام", callback_data=f"help_instagram_{user_id}_1", style="success")
+        ],
+        [
+            InlineKeyboardButton("دانلود تلگرام", callback_data=f"help_download_{user_id}_1", style="danger"),
+            InlineKeyboardButton("مدیریت گروه/کانال", callback_data=f"help_new_{user_id}_1", style="danger")
+        ],
+        [
+            InlineKeyboardButton("تایمر میو", callback_data=f"help_mewo_{user_id}_1", style="primary"),
+            InlineKeyboardButton("پیام زمان‌دار", callback_data=f"help_schedule_{user_id}_1", style="primary")
+        ],
+        [
+            InlineKeyboardButton("مدیریت اکشن", callback_data=f"help_action_{user_id}_1", style="success"),
+            InlineKeyboardButton("مدیریت گروه", callback_data=f"help_group_{user_id}_1", style="success")
+        ],
+        [InlineKeyboardButton(f"{mark('bio_time')} ساعت در بایو", callback_data=f"adv_biotime_{user_id}_1", style="primary")],
+        [InlineKeyboardButton(f"{mark('save_deleted')} ذخیره حذفیات", callback_data=f"adv_savedel_{user_id}_1", style="primary")],
+        [InlineKeyboardButton(f"{mark('save_edited')} ذخیره ویرایش‌ها", callback_data=f"adv_saveedit_{user_id}_1", style="primary")],
+        [
+            InlineKeyboardButton("رصد کاربران", callback_data=f"help_watch_{user_id}_1", style="success"),
+            InlineKeyboardButton("پروفایل خودکار", callback_data=f"help_autoprofile_{user_id}_1", style="success")
+        ],
+        [InlineKeyboardButton("انقضا / زمان باقی‌مانده", callback_data=f"adv_expiry_{user_id}_1", style="danger")],
+        [InlineKeyboardButton("❌ بستن", callback_data=f"close_{user_id}", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+# سازگاری با فراخوانی‌های قدیمی: همهٔ صفحه‌ها به پنل تک‌صفحه‌ای اشاره می‌کنند.
+def get_main_menu_page1(user_id):
+    return get_main_menu(user_id)
+
+
+def get_main_menu_page2(user_id):
+    return get_main_menu(user_id)
 
 def get_back_button(user_id, from_page=1):
     return InlineKeyboardMarkup([
@@ -1076,13 +1062,13 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
    
-    text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 <i>صفحه اول - 12 قابلیت اصلی</i>"
+    text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 <i>همهٔ قابلیت‌ها در یک صفحه</i>"
     photo = get_panel_photo()
     
     await update.message.reply_photo(
         photo=photo,
         caption=text,
-        reply_markup=get_main_menu_page1(user_id),
+        reply_markup=get_main_menu(user_id),
         parse_mode='HTML'
     )
 async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1114,31 +1100,17 @@ async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE
         if query == "panel":
             result1 = InlineQueryResultArticle(
                 id="1",
-                title="🎛 پنل مدیریت سلف - صفحه 1",
-                description="12 قابلیت اصلی",
+                title="🎛 پنل مدیریت سلف",
+                description="همهٔ قابلیت‌ها در یک صفحه",
                 input_message_content=InputTextMessageContent(
-                    message_text="<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه اول",
+                    message_text="<b>🎛 پنل مدیریت سلف</b>",
                     parse_mode='HTML'
                 ),
-                reply_markup=get_main_menu_page1(user_id),
+                reply_markup=get_main_menu(user_id),
                 thumbnail_url=PANEL_IMAGE
             )
-            
-            result2 = InlineQueryResultArticle(
-                id="2",
-                title="🎛 پنل مدیریت سلف - صفحه 2",
-                description="15 قابلیت تکمیلی",
-                input_message_content=InputTextMessageContent(
-                    message_text="<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه دوم",
-                    parse_mode='HTML'
-                ),
-                reply_markup=get_main_menu_page2(user_id),
-                thumbnail_url=PANEL_IMAGE
-            )
-            
-            results = [result1, result2]
-            
-            await update.inline_query.answer(results, cache_time=0, is_personal=True)
+
+            await update.inline_query.answer([result1], cache_time=0, is_personal=True)
             logger.info(f"✅ نتایج اینلاین ارسال شد")
             
     except Exception as e:
@@ -1159,27 +1131,13 @@ async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFA
         
         photo = get_panel_photo()
         await asyncio.sleep(1)
-        if result_id == "1":
-            text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه اول"
-            await context.bot.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                inline_message_id=inline_message_id,
-                reply_markup=get_main_menu_page1(user_id)
-            )
-            logger.info(f"✅ صفحه 1 با عکس ادیت شد برای کاربر {user_id}")
-            
-        elif result_id == "2":
-            text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه دوم"
-            logger.info(f"📝 ادیت صفحه 2 با عکس")
-            
-            await context.bot.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                inline_message_id=inline_message_id,
-                reply_markup=get_main_menu_page2(user_id)
-            )
-            logger.info(f"✅ صفحه 2 با عکس ادیت شد برای کاربر {user_id}")
-        else:
-            logger.warning(f"⚠️ result_id ناشناس: {result_id}")
+        text = "<b>🎛 پنل مدیریت سلف</b>"
+        await context.bot.edit_message_media(
+            media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
+            inline_message_id=inline_message_id,
+            reply_markup=get_main_menu(user_id)
+        )
+        logger.info(f"✅ پنل با عکس ادیت شد برای کاربر {user_id}")
             
     except Exception as e:
         logger.error(f"❌ خطا در handle_chosen_inline_result: {e}")
@@ -1279,47 +1237,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "Message is not modified" not in str(e):
                 logger.error(f"❌ خطا در ادیت: {e}")
         return
-    if action == "help_back":
-        if page == 1:
-            text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه اول"
-            try:
-                await query.edit_message_media(
-                    media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                    reply_markup=get_main_menu_page1(user_id)
-                )
-            except Exception as e:
-                if "Message is not modified" not in str(e):
-                    print(f"Error: {e}")
-        else:
-            text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه دوم"
-            try:
-                await query.edit_message_media(
-                    media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                    reply_markup=get_main_menu_page2(user_id)
-                )
-            except Exception as e:
-                if "Message is not modified" not in str(e):
-                    print(f"Error: {e}")
-        return
-    
-    if action == "page1":
-        text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه اول"
+    if action in ("help_back", "page1", "page2"):
+        text = "<b>🎛 پنل مدیریت سلف</b>"
         try:
             await query.edit_message_media(
                 media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                reply_markup=get_main_menu_page1(user_id)
-            )
-        except Exception as e:
-            if "Message is not modified" not in str(e):
-                print(f"Error: {e}")
-        return
-    
-    if action == "page2":
-        text = "<b>🎛 پنل مدیریت سلف</b>\n\n💡 صفحه دوم"
-        try:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                reply_markup=get_main_menu_page2(user_id)
+                reply_markup=get_main_menu(user_id)
             )
         except Exception as e:
             if "Message is not modified" not in str(e):
@@ -1522,22 +1445,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "Message is not modified" not in str(e):
                     print(f"Error: {e}")
             return
-    if action == "advanced":
-        text = (
-            "⭐️ <b>قابلیت‌های پیشرفته (سبک Self VTR)</b>\n\n"
-            "با دکمه‌های زیر قابلیت‌ها را روشن/خاموش کنید.\n"
-            "برای رصد کاربران و پروفایل خودکار، راهنمای مربوطه را ببینید."
-        )
-        try:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
-                reply_markup=get_advanced_buttons(user_id, page)
-            )
-        except Exception as e:
-            if "Message is not modified" not in str(e):
-                print(f"Error: {e}")
-        return
-
     if action == "adv":
         feature = parts[1]
         settings = load_settings(user_id)
@@ -1563,10 +1470,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_media(
                     media=InputMediaPhoto(
                         media=photo,
-                        caption="⭐️ <b>قابلیت‌های پیشرفته (سبک Self VTR)</b>",
+                        caption=f"✅ <b>{cmd} {'روشن' if new_state else 'خاموش'} شد</b>",
                         parse_mode='HTML',
                     ),
-                    reply_markup=get_advanced_buttons(user_id, page),
+                    reply_markup=get_main_menu(user_id),
                 )
             except Exception as e:
                 if "Message is not modified" not in str(e):
