@@ -5561,6 +5561,51 @@ async def execute_command_from_helper(command, user_id):
             print(f"✅ ساعت ایموجی: {emoji_clock_enabled}")
             return
 
+        # ── لیست گروه‌های کاربر برای انتخاب در پنل بازی‌های میو ────────────
+        if command == "لیست گروه":
+            groups = []
+            try:
+                async for dialog in app.get_dialogs():
+                    ch = dialog.chat
+                    if ch and ch.type in (enums.ChatType.GROUP, enums.ChatType.SUPERGROUP):
+                        groups.append({"id": ch.id, "title": (ch.title or str(ch.id))[:64]})
+            except Exception as e:
+                print(f"❌ خطا در دریافت گروه‌ها: {e}")
+            try:
+                with open(f"groups_{user_id}.json", "w", encoding="utf-8") as f:
+                    json.dump({"groups": groups, "timestamp": time.time()},
+                              f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"❌ خطا در ذخیرهٔ گروه‌ها: {e}")
+            print(f"✅ {len(groups)} گروه برای کاربر {user_id} ذخیره شد")
+            return
+
+        if command == "بازی توقف همه":
+            n = 0
+            for key in list(game_timers.keys()):
+                entry = game_timers.pop(key, None)
+                if entry and entry.get("task") and not entry["task"].done():
+                    entry["task"].cancel()
+                    n += 1
+            print(f"✅ همهٔ بازی‌های خودکار متوقف شدند ({n} مورد)")
+            return
+
+        # ── روشن/خاموش‌کردن بازی خودکار میو در یک گروهِ مشخص از پنل ─────────
+        if command.startswith("بازی گروه|"):
+            try:
+                _, keyword, chat_id_s, minutes_s, action = command.split("|", 4)
+                chat_id = int(chat_id_s)
+                if action == "روشن":
+                    minutes = float(minutes_s)
+                    _start_game_timer(app, chat_id, keyword, minutes)
+                    print(f"✅ بازی خودکار «{keyword}» در {chat_id} هر {minutes} دقیقه روشن شد")
+                else:
+                    cnt = _stop_game_timer(chat_id, keyword)
+                    print(f"✅ بازی خودکار «{keyword}» در {chat_id} خاموش شد (تعداد: {cnt})")
+            except Exception as e:
+                print(f"❌ خطا در بازی گروه: {e}")
+            return
+
     except Exception as e:
         print(f"❌ خطا در اجرای دستور {command}: {e}")
         import traceback

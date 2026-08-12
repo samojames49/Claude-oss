@@ -115,6 +115,92 @@ def save_settings(user_id, settings):
     except Exception as e:
         print(f"❌ خطا در save_settings: {e}")
         return False
+
+
+# بازی‌های خودکار ربات میو: (نام نمایشی، کلمه‌ای که سلف می‌فرستد، فاصلهٔ پیش‌فرض دقیقه)
+MEW_GAMES = [
+    ("🎣 ماهیگیری", "ماهیگیری", 5),
+    ("👨‍🍳 آشپزی", "آشپزی", 10),
+    ("🏭 کارخونه", "کارخونه", 30),
+    ("🐱 گرفتن گربه", "گربه", 2),
+    ("🪙 میو کوین", "میو کوین", 15),
+    ("😺 میو", "میو", 4),
+]
+
+MAX_GROUPS_SHOWN = 30
+
+
+def load_groups(user_id):
+    """لیست گروه‌های کاربر که سلف در groups_<user_id>.json نوشته است."""
+    try:
+        path = f"groups_{user_id}.json"
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return (json.load(f) or {}).get("groups", [])
+    except Exception as e:
+        print(f"❌ خطا در load_groups: {e}")
+    return []
+
+
+def _mew_interval(settings, keyword, default_min):
+    return int((settings.get('mew_interval') or {}).get(keyword, default_min))
+
+
+def _mew_is_active(settings, keyword, chat_id):
+    return str(chat_id) in ((settings.get('mew_active') or {}).get(keyword, {}))
+
+
+def build_mew_menu(user_id):
+    """منوی انتخاب بازیِ ربات میو."""
+    rows = []
+    for idx, (name, _kw, _mn) in enumerate(MEW_GAMES):
+        rows.append([InlineKeyboardButton(name, callback_data=f"mewgame_{idx}_{user_id}_1", style="primary")])
+    rows.append([InlineKeyboardButton("🔄 بروزرسانی گروه‌ها", callback_data=f"mewrefresh_{user_id}_1", style="success")])
+    rows.append([InlineKeyboardButton("🛑 توقف همهٔ بازی‌ها", callback_data=f"mewstopall_{user_id}_1", style="danger")])
+    rows.append([InlineKeyboardButton("🔙 بازگشت", callback_data=f"help_back_{user_id}_1", style="secondary")])
+    return InlineKeyboardMarkup(rows)
+
+
+def build_mew_game_menu(user_id, idx):
+    """منوی یک بازی: انتخاب گروه‌های کاربر + تنظیم فاصلهٔ زمانی."""
+    settings = load_settings(user_id)
+    name, keyword, default_min = MEW_GAMES[idx]
+    interval = _mew_interval(settings, keyword, default_min)
+    groups = settings.get('mew_groups') or load_groups(user_id)
+
+    rows = [[
+        InlineKeyboardButton("➖", callback_data=f"mewint_{idx}_dec_{user_id}_1", style="danger"),
+        InlineKeyboardButton(f"⏱ هر {interval} دقیقه", callback_data="wait", style="secondary"),
+        InlineKeyboardButton("➕", callback_data=f"mewint_{idx}_inc_{user_id}_1", style="success"),
+    ]]
+    if not groups:
+        rows.append([InlineKeyboardButton("⚠️ گروهی پیدا نشد — «بروزرسانی گروه‌ها»", callback_data=f"mewrefresh_{user_id}_1", style="warning")])
+    else:
+        for gidx, g in enumerate(groups[:MAX_GROUPS_SHOWN]):
+            mark = "✅" if _mew_is_active(settings, keyword, g.get("id")) else "⬜️"
+            title = (g.get("title") or str(g.get("id")))[:40]
+            rows.append([InlineKeyboardButton(f"{mark} {title}", callback_data=f"mewtog_{idx}_{gidx}_{user_id}_1",
+                                              style="success" if mark == "✅" else "primary")])
+        if len(groups) > MAX_GROUPS_SHOWN:
+            rows.append([InlineKeyboardButton(f"… و {len(groups) - MAX_GROUPS_SHOWN} گروه دیگر", callback_data="wait", style="secondary")])
+    rows.append([InlineKeyboardButton("🔄 بروزرسانی گروه‌ها", callback_data=f"mewrefresh_{user_id}_1", style="success")])
+    rows.append([InlineKeyboardButton("🔙 بازگشت", callback_data=f"mewmenu_{user_id}_1", style="secondary")])
+    return InlineKeyboardMarkup(rows)
+
+
+def mew_game_caption(user_id, idx):
+    name, keyword, default_min = MEW_GAMES[idx]
+    settings = load_settings(user_id)
+    interval = _mew_interval(settings, keyword, default_min)
+    active = (settings.get('mew_active') or {}).get(keyword, {})
+    return (
+        f"<b>{name} — بازی خودکار میو</b>\n\n"
+        f"گروهی را که در آن با ربات میو بازی می‌کنید انتخاب کنید. "
+        f"سلف هر <b>{interval} دقیقه</b> کلمهٔ <code>{keyword}</code> را در آن گروه می‌فرستد.\n\n"
+        f"✅ = فعال | ⬜️ = غیرفعال\n"
+        f"🎯 گروه‌های فعال فعلی: <b>{len(active)}</b>\n"
+        f"💡 تغییر فاصله روی گروه‌های فعال، بعد از خاموش/روشن‌کردن دوباره اعمال می‌شود."
+    )
 async def handle_admin_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not update.message or not update.message.photo:
@@ -1281,7 +1367,7 @@ def get_main_menu(user_id):
             InlineKeyboardButton("📱 نشست‌ها / گوشی‌ها", callback_data=f"help_sessions_{user_id}_1", style="danger"),
             InlineKeyboardButton("👀 خواندن همه چت‌ها", callback_data=f"help_readall_{user_id}_1", style="primary")
         ],
-        [InlineKeyboardButton("🐱 بازی‌های خودکار میو", callback_data=f"help_mewgames_{user_id}_1", style="warning")],
+        [InlineKeyboardButton("🐱 بازی‌های خودکار میو", callback_data=f"mewmenu_{user_id}_1", style="warning")],
         [
             InlineKeyboardButton("⏬ دانلود تیک‌تاک/ساندکلاود", callback_data=f"help_downloads_{user_id}_1", style="primary"),
             InlineKeyboardButton("🎧 ویس‌چت / پخش", callback_data=f"help_voicechat_{user_id}_1", style="secondary")
@@ -1729,6 +1815,122 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "Message is not modified" not in str(e):
                     print(f"Error: {e}")
             return
+    # ── بازی‌های خودکار ربات میو: انتخاب گروه‌های خود کاربر ──────────────────
+    if action == "mewmenu":
+        text = ("🐱 <b>بازی‌های خودکار ربات میو</b>\n\n"
+                "یک بازی را انتخاب کنید، سپس گروه‌های خودتان را برای اجرای خودکار آن انتخاب کنید.\n"
+                "💡 اگر لیست گروه‌ها خالی بود، «بروزرسانی گروه‌ها» را بزنید.")
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
+                reply_markup=build_mew_menu(user_id),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "mewrefresh":
+        send_command_to_self_bot("لیست گروه", user_id)
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption="🔄 در حال دریافت گروه‌های شما از سلف...", parse_mode='HTML'),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⏳ صبر کنید...", callback_data="wait", style="primary")]]),
+            )
+        except Exception:
+            pass
+        await asyncio.sleep(2.5)
+        groups = load_groups(user_id)
+        settings = load_settings(user_id)
+        settings['mew_groups'] = groups
+        save_settings(user_id, settings)
+        text = (f"✅ <b>{len(groups)} گروه</b> پیدا شد.\n\nحالا یک بازی را انتخاب کنید:")
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=text, parse_mode='HTML'),
+                reply_markup=build_mew_menu(user_id),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "mewstopall":
+        send_command_to_self_bot("بازی توقف همه", user_id)
+        settings = load_settings(user_id)
+        settings['mew_active'] = {}
+        save_settings(user_id, settings)
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption="🛑 همهٔ بازی‌های خودکار متوقف شدند.", parse_mode='HTML'),
+                reply_markup=build_mew_menu(user_id),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "mewgame":
+        idx = int(parts[1]) if parts[1].isdigit() and int(parts[1]) < len(MEW_GAMES) else 0
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=mew_game_caption(user_id, idx), parse_mode='HTML'),
+                reply_markup=build_mew_game_menu(user_id, idx),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "mewint":
+        idx = int(parts[1]) if parts[1].isdigit() and int(parts[1]) < len(MEW_GAMES) else 0
+        direction = parts[2]
+        name, keyword, default_min = MEW_GAMES[idx]
+        settings = load_settings(user_id)
+        intervals = settings.setdefault('mew_interval', {})
+        cur = int(intervals.get(keyword, default_min))
+        cur = min(120, cur + 1) if direction == "inc" else max(1, cur - 1)
+        intervals[keyword] = cur
+        save_settings(user_id, settings)
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=mew_game_caption(user_id, idx), parse_mode='HTML'),
+                reply_markup=build_mew_game_menu(user_id, idx),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
+    if action == "mewtog":
+        idx = int(parts[1]) if parts[1].isdigit() and int(parts[1]) < len(MEW_GAMES) else 0
+        gidx = int(parts[2]) if parts[2].isdigit() else 0
+        name, keyword, default_min = MEW_GAMES[idx]
+        settings = load_settings(user_id)
+        groups = settings.get('mew_groups') or load_groups(user_id)
+        if gidx >= len(groups):
+            await query.answer("گروه یافت نشد؛ «بروزرسانی گروه‌ها» را بزنید.", show_alert=True)
+            return
+        chat_id = groups[gidx].get("id")
+        interval = _mew_interval(settings, keyword, default_min)
+        active = settings.setdefault('mew_active', {}).setdefault(keyword, {})
+        if str(chat_id) in active:
+            del active[str(chat_id)]
+            send_command_to_self_bot(f"بازی گروه|{keyword}|{chat_id}|{interval}|خاموش", user_id)
+        else:
+            active[str(chat_id)] = interval
+            send_command_to_self_bot(f"بازی گروه|{keyword}|{chat_id}|{interval}|روشن", user_id)
+        save_settings(user_id, settings)
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=mew_game_caption(user_id, idx), parse_mode='HTML'),
+                reply_markup=build_mew_game_menu(user_id, idx),
+            )
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"Error: {e}")
+        return
+
     if action == "adv":
         feature = parts[1]
         settings = load_settings(user_id)
