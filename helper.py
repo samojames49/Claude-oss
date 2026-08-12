@@ -807,6 +807,26 @@ HELP_TEXTS = {
 
 <b>کاربرد:</b>
 حذف آخرین پیام‌های خودتان در همین چت (حداکثر ۱۰۰ پیام).
+""",
+    "extra": """
+🧰 <b>ابزارهای تکمیلی (SelfSaz)</b>
+
+<b>دستورات قابل کپی:</b>
+<code>کپی</code> (ریپلای)
+<code>بلاک @username</code> / <code>آنبلاک @username</code>
+<code>یوزرنیم تنظیم myname</code>
+<code>یوزرنیم @username</code>
+<code>کارت تنظیم 6037xxxxxxxxxxxx نام صاحب</code>
+<code>کارت</code> / <code>کارت حذف</code>
+<code>یونیکس 1700000000</code>
+<code>سن 1380</code>
+<code>کلمه سلام دنیا</code>
+<code>اسمم</code> / <code>شماره من</code>
+<code>ایدی گروه</code>
+
+<b>کاربرد:</b>
+کپی پیام، بلاک/آنبلاک، تنظیم یوزرنیم و شماره کارت،
+تبدیل زمان یونیکس، محاسبهٔ سن، ارسال کلمه‌به‌کلمه و اطلاعات حساب.
 """
 }
 
@@ -1111,7 +1131,10 @@ def get_main_menu(user_id):
             InlineKeyboardButton("🌐 مترجم", callback_data=f"help_translate_{user_id}_1", style="primary"),
             InlineKeyboardButton("📊 نظرسنجی", callback_data=f"help_poll_{user_id}_1", style="primary")
         ],
-        [InlineKeyboardButton("🧹 پاکسازی پیام‌های من", callback_data=f"help_purge_{user_id}_1", style="danger")],
+        [
+            InlineKeyboardButton("🧹 پاکسازی پیام‌های من", callback_data=f"help_purge_{user_id}_1", style="danger"),
+            InlineKeyboardButton("🧰 ابزار تکمیلی", callback_data=f"help_extra_{user_id}_1", style="warning")
+        ],
         [InlineKeyboardButton("❌ بستن", callback_data=f"close_{user_id}", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)

@@ -4470,6 +4470,203 @@ async def translate_command(client, message):
         await message.edit("❌ ترجمه ناموفق بود (خطای شبکه).")
 
 
+# ══════════════════════════════════════════════════════════════════════════
+#          دستورهای الهام‌گرفته از سلف‌سازهای رایج (SelfSaz-style)
+# ══════════════════════════════════════════════════════════════════════════
+def _bank_card_file():
+    return f"bank_card_{USER_ID or 'me'}.json"
+
+
+def _load_bank_card():
+    try:
+        p = _bank_card_file()
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_bank_card(data):
+    try:
+        with open(_bank_card_file(), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
+
+
+async def _resolve_target_user(client, message, arg):
+    if message.reply_to_message and message.reply_to_message.from_user:
+        return message.reply_to_message.from_user
+    if arg:
+        try:
+            return await client.get_users(arg.strip().lstrip("@"))
+        except Exception:
+            return None
+    return None
+
+
+@app.on_message(filters.me & filters.regex(r"^کپی$") & filters.reply)
+async def copy_message_command(client, message):
+    try:
+        await message.reply_to_message.copy(message.chat.id)
+        await message.delete()
+    except Exception:
+        await message.edit("❌ کپی پیام ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^بلاک( .+)?$"))
+async def block_user_command(client, message):
+    arg = message.matches[0].group(1)
+    target = await _resolve_target_user(client, message, arg)
+    if not target:
+        return await message.edit("❌ روی پیام کاربر ریپلای کنید یا یوزرنیم بدهید.\nمثال: `بلاک @username`")
+    try:
+        await client.block_user(target.id)
+        await message.edit(f"🚫 **بلاک شد**\n👤 {target.first_name or ''} (`{target.id}`)")
+    except Exception:
+        await message.edit("❌ بلاک ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^آنبلاک( .+)?$"))
+async def unblock_user_command(client, message):
+    arg = message.matches[0].group(1)
+    target = await _resolve_target_user(client, message, arg)
+    if not target:
+        return await message.edit("❌ روی پیام کاربر ریپلای کنید یا یوزرنیم بدهید.\nمثال: `آنبلاک @username`")
+    try:
+        await client.unblock_user(target.id)
+        await message.edit(f"✅ **آنبلاک شد**\n👤 {target.first_name or ''} (`{target.id}`)")
+    except Exception:
+        await message.edit("❌ آنبلاک ممکن نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^یوزرنیم تنظیم( .+)?$"))
+async def set_username_command(client, message):
+    grp = message.matches[0].group(1)
+    uname = grp.strip().lstrip("@") if grp else ""
+    try:
+        await client.set_username(uname or None)
+        if uname:
+            await message.edit(f"✅ یوزرنیم به @{uname} تغییر کرد.")
+        else:
+            await message.edit("✅ یوزرنیم حذف شد.")
+    except Exception:
+        await message.edit("❌ تغییر یوزرنیم ممکن نشد (شاید قبلاً گرفته شده).")
+
+
+@app.on_message(filters.me & filters.regex(r"^یوزرنیم (?!تنظیم)(.+)$"))
+async def lookup_username_command(client, message):
+    arg = message.matches[0].group(1).strip()
+    try:
+        u = await client.get_users(arg.lstrip("@") if not arg.lstrip("-").isdigit() else int(arg))
+        uname = f"@{u.username}" if u.username else "—"
+        await message.edit(
+            f"🔎 **اطلاعات کاربر**\n👤 {u.first_name or ''} {u.last_name or ''}\n"
+            f"🆔 `{u.id}`\n🔗 {uname}"
+        )
+    except Exception:
+        await message.edit("❌ کاربر پیدا نشد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^کارت تنظیم (.+)$", flags=re.DOTALL))
+async def set_card_command(client, message):
+    raw = message.matches[0].group(1).strip()
+    m = re.match(r"^([\d۰-۹\-\s]{12,25})\s*(.*)$", raw)
+    if not m:
+        return await message.edit("❌ فرمت: `کارت تنظیم 6037xxxxxxxxxxxx نام صاحب کارت`")
+    number = re.sub(r"\s+", "", m.group(1)).translate(_FA_DIGITS)
+    holder = m.group(2).strip() or "—"
+    _save_bank_card({"number": number, "holder": holder})
+    await message.edit(f"💳 **شماره کارت ذخیره شد**\n`{number}`\n👤 {holder}")
+
+
+@app.on_message(filters.me & filters.regex(r"^کارت$"))
+async def get_card_command(client, message):
+    data = _load_bank_card()
+    if not data.get("number"):
+        return await message.edit("❌ شماره کارتی ثبت نشده. `کارت تنظیم <شماره> <نام>`")
+    await message.edit(f"💳 **شماره کارت**\n`{data['number']}`\n👤 {data.get('holder', '—')}")
+
+
+@app.on_message(filters.me & filters.regex(r"^کارت حذف$"))
+async def del_card_command(client, message):
+    _save_bank_card({})
+    await message.edit("🗑 شماره کارت حذف شد.")
+
+
+@app.on_message(filters.me & filters.regex(r"^یونیکس ([\d۰-۹]+)$"))
+async def unix_time_command(client, message):
+    ts = _to_int(message.matches[0].group(1))
+    try:
+        dt = datetime.fromtimestamp(ts, tz=pytz.timezone("Asia/Tehran"))
+        await message.edit(f"🕰 **تبدیل زمان یونیکس**\n`{ts}`\n📅 {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+    except Exception:
+        await message.edit("❌ عدد نامعتبر است.")
+
+
+@app.on_message(filters.me & filters.regex(r"^سن ([\d۰-۹]{4})$"))
+async def age_command(client, message):
+    year = _to_int(message.matches[0].group(1))
+    now_year = get_iran_now().year
+    # اگر سال شمسی وارد شده باشد (مثل 1380) به میلادی تقریبی تبدیل کن
+    if year < 1700:
+        birth_greg = year + 621
+    else:
+        birth_greg = year
+    age = now_year - birth_greg
+    if 0 <= age <= 120:
+        await message.edit(f"🎂 **سن تقریبی:** {age} سال")
+    else:
+        await message.edit("❌ سال نامعتبر است. مثال: `سن 1380` یا `سن 2001`")
+
+
+@app.on_message(filters.me & filters.regex(r"^کلمه (.+)$", flags=re.DOTALL))
+async def word_by_word_command(client, message):
+    words = message.matches[0].group(1).split()
+    if not words:
+        return
+    chat_id = message.chat.id
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    for w in words[:50]:
+        try:
+            await client.send_message(chat_id, w)
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except Exception:
+            pass
+        await asyncio.sleep(0.3)
+
+
+@app.on_message(filters.me & filters.regex(r"^اسمم$"))
+async def my_name_command(client, message):
+    me = await client.get_me()
+    uname = f"@{me.username}" if me.username else "—"
+    await message.edit(
+        f"👤 **مشخصات شما**\nنام: {me.first_name or ''} {me.last_name or ''}\n"
+        f"🆔 `{me.id}`\n🔗 {uname}"
+    )
+
+
+@app.on_message(filters.me & filters.regex(r"^شماره من$"))
+async def my_number_command(client, message):
+    me = await client.get_me()
+    phone = getattr(me, "phone_number", None)
+    if phone:
+        await message.edit(f"📱 **شمارهٔ شما:** `+{phone}`")
+    else:
+        await message.edit("ℹ️ شماره در دسترس نیست.")
+
+
+@app.on_message(filters.me & filters.regex(r"^[آا]یدی گروه$") & filters.group)
+async def group_id_command(client, message):
+    await message.edit(f"🆔 **آیدی این گروه:** `{message.chat.id}`\n📛 {message.chat.title or ''}")
+
+
 # ── آخرین هندلر گروه: فرمت‌کنندهٔ خودکارِ متنِ خروجی ─────────────────────────
 # چون آخرین هندلرِ ثبت‌شده است، فقط پیام‌هایی که هیچ دستوری آن‌ها را نگرفته را
 # پردازش می‌کند و دیگر مانع اجرای دستورها نمی‌شود.
